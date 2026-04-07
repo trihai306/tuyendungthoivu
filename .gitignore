@@ -36,3 +36,4 @@ backend/bootstrap/cache/*.php
 
 # Frontend
 frontend/.vite/
+.mcp.json
