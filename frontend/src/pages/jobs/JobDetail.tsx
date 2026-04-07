@@ -587,6 +587,68 @@ export function JobDetail() {
         </div>
       </div>
 
+      {/* Related Jobs */}
+      <div className="space-y-4">
+        <h2 className="text-[15px] font-semibold text-foreground">
+          Tin tuyển dụng liên quan
+        </h2>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {Object.values(MOCK_JOBS)
+            .filter((j) => j.id !== job.id)
+            .slice(0, 3)
+            .map((relatedJob) => {
+              const relTypeConfig = JOB_TYPE_CONFIG[relatedJob.jobType]
+              return (
+                <Link
+                  key={relatedJob.id}
+                  to={`/tin-tuyen-dung/${relatedJob.id}`}
+                  className="block"
+                >
+                  <Card className="group relative overflow-hidden border-border/50 shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer">
+                    <CardContent className="p-5">
+                      <div className="flex items-start gap-3">
+                        <Avatar className="h-10 w-10 rounded-xl">
+                          <AvatarFallback
+                            className={`bg-gradient-to-br ${relatedJob.companyGradient} rounded-xl text-[10px] font-semibold text-white`}
+                          >
+                            {relatedJob.companyInitials}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-[14px] font-semibold leading-snug text-foreground group-hover:text-primary transition-colors truncate">
+                            {relatedJob.title}
+                          </h3>
+                          <p className="mt-0.5 text-[12px] text-muted-foreground truncate">
+                            {relatedJob.company}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        <span>{relatedJob.location}</span>
+                        <span className="mx-1">·</span>
+                        <DollarSign className="h-3 w-3 shrink-0" />
+                        <span>
+                          {formatSalary(relatedJob.salaryMin)} -{" "}
+                          {formatSalary(relatedJob.salaryMax)} VNĐ
+                        </span>
+                      </div>
+                      <div className="mt-3">
+                        <Badge
+                          variant="outline"
+                          className={`rounded-md text-[11px] font-medium ${relTypeConfig.className}`}
+                        >
+                          {relTypeConfig.label}
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              )
+            })}
+        </div>
+      </div>
+
       {/* Back link */}
       <div>
         <Button

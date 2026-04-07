@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -13,6 +14,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
 import {
   Select,
   SelectContent,
@@ -33,6 +36,14 @@ import {
   Save,
   Send,
   Sparkles,
+  Eye,
+  Pencil,
+  MapPin,
+  DollarSign,
+  Briefcase,
+  Users,
+  CalendarDays,
+  CheckCircle2,
 } from "lucide-react"
 
 // ─── Zod Schema ──────────────────────────────────────────────────────────────
@@ -111,13 +122,80 @@ function FormField({
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
+const SALARY_TYPE_LABELS: Record<string, string> = {
+  hourly: "Theo giờ",
+  daily: "Theo ngày",
+  monthly: "Theo tháng",
+}
+
+const JOB_TYPE_LABELS: Record<string, string> = {
+  "full-time": "Toàn thời gian",
+  "part-time": "Bán thời gian",
+  seasonal: "Thời vụ",
+}
+
+const JOB_TYPE_BADGE_STYLES: Record<string, string> = {
+  "full-time":
+    "bg-blue-50 text-blue-700 border-blue-200/80 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20",
+  "part-time":
+    "bg-emerald-50 text-emerald-700 border-emerald-200/80 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20",
+  seasonal:
+    "bg-amber-50 text-amber-700 border-amber-200/80 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20",
+}
+
+function formatSalary(amount: number): string {
+  if (amount >= 1000000) {
+    const millions = amount / 1000000
+    return `${millions % 1 === 0 ? millions.toFixed(0) : millions.toFixed(1)} triệu`
+  }
+  return new Intl.NumberFormat("vi-VN").format(amount)
+}
+
+function PreviewSection({
+  title,
+  content,
+  icon: Icon,
+}: {
+  title: string
+  content: string
+  icon: React.ComponentType<{ className?: string }>
+}) {
+  const items = content
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean)
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+          <Icon className="h-4 w-4 text-primary" />
+        </div>
+        <h3 className="text-[15px] font-semibold text-foreground">{title}</h3>
+      </div>
+      <ul className="space-y-2 pl-1">
+        {items.map((item, i) => (
+          <li
+            key={i}
+            className="flex items-start gap-2 text-[13px] text-muted-foreground leading-relaxed"
+          >
+            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export function JobCreate() {
   const navigate = useNavigate()
+  const [showPreview, setShowPreview] = useState(false)
 
   const {
     register,
     handleSubmit,
     control,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<JobCreateFormData>({
     resolver: zodResolver(jobCreateSchema),
@@ -138,6 +216,8 @@ export function JobCreate() {
       endDate: "",
     },
   })
+
+  const watchedValues = watch()
 
   const onSubmit = (data: JobCreateFormData) => {
     // TODO: Call API to create job posting
@@ -488,6 +568,107 @@ export function JobCreate() {
           </CardContent>
         </Card>
 
+        {/* Preview Panel */}
+        {showPreview && (
+          <Card className="border-border/50 shadow-sm border-primary/20">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-[15px] font-semibold flex items-center gap-2">
+                  <Eye className="h-4 w-4 text-primary" />
+                  Xem trước tin tuyển dụng
+                </CardTitle>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowPreview(false)}
+                >
+                  <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                  Chỉnh sửa
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Preview Header */}
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">
+                  {watchedValues.title || "Chưa có tiêu đề"}
+                </h2>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {watchedValues.jobType && (
+                    <Badge
+                      variant="outline"
+                      className={`rounded-md text-[11px] font-medium ${JOB_TYPE_BADGE_STYLES[watchedValues.jobType] || ""}`}
+                    >
+                      {JOB_TYPE_LABELS[watchedValues.jobType] || watchedValues.jobType}
+                    </Badge>
+                  )}
+                  {watchedValues.city && (
+                    <span className="flex items-center gap-1 text-[12px] text-muted-foreground">
+                      <MapPin className="h-3 w-3" />
+                      {watchedValues.city}
+                      {watchedValues.district && `, ${watchedValues.district}`}
+                    </span>
+                  )}
+                  {(watchedValues.salaryMin > 0 || watchedValues.salaryMax > 0) && (
+                    <span className="flex items-center gap-1 text-[12px] text-muted-foreground">
+                      <DollarSign className="h-3 w-3" />
+                      {formatSalary(watchedValues.salaryMin)} -{" "}
+                      {formatSalary(watchedValues.salaryMax)} VNĐ
+                      {watchedValues.salaryType && `/${SALARY_TYPE_LABELS[watchedValues.salaryType]?.replace("Theo ", "") || ""}`}
+                    </span>
+                  )}
+                  {watchedValues.positions > 0 && (
+                    <span className="flex items-center gap-1 text-[12px] text-muted-foreground">
+                      <Users className="h-3 w-3" />
+                      {watchedValues.positions} vị trí
+                    </span>
+                  )}
+                  {(watchedValues.startDate || watchedValues.endDate) && (
+                    <span className="flex items-center gap-1 text-[12px] text-muted-foreground">
+                      <CalendarDays className="h-3 w-3" />
+                      {watchedValues.startDate} - {watchedValues.endDate}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Preview Content */}
+              {watchedValues.description && (
+                <PreviewSection
+                  title="Mô tả công việc"
+                  content={watchedValues.description}
+                  icon={Briefcase}
+                />
+              )}
+
+              {watchedValues.requirements && (
+                <>
+                  <Separator />
+                  <PreviewSection
+                    title="Yêu cầu ứng viên"
+                    content={watchedValues.requirements}
+                    icon={Users}
+                  />
+                </>
+              )}
+
+              {watchedValues.benefits && (
+                <>
+                  <Separator />
+                  <PreviewSection
+                    title="Quyền lợi"
+                    content={watchedValues.benefits}
+                    icon={CheckCircle2}
+                  />
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Action Buttons */}
         <div className="flex items-center justify-between rounded-xl border border-border/50 bg-card p-4 shadow-sm">
           <Button
@@ -501,6 +682,14 @@ export function JobCreate() {
           </Button>
 
           <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowPreview(!showPreview)}
+            >
+              <Eye className="mr-1.5 h-3.5 w-3.5" />
+              {showPreview ? "Ẩn xem trước" : "Xem trước"}
+            </Button>
             <Button
               type="button"
               variant="outline"
