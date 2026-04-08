@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom"
 import {
   Card,
   CardContent,
@@ -8,7 +9,7 @@ import {
   BarChart3,
   Users,
   Building2,
-  Home,
+  Wallet,
   ArrowRight,
   Sparkles,
   TrendingUp,
@@ -23,48 +24,55 @@ interface ReportCategory {
   stats: string
   badge: string
   badgeColor: string
+  link: string
 }
 
 const reportCategories: ReportCategory[] = [
   {
-    title: "Tuyển dụng",
-    description: "Hiệu quả tuyển dụng, tỷ lệ chuyển đổi từ ứng tuyển đến tuyển dụng thành công, thời gian trung bình tuyển dụng",
+    title: "Yêu cầu tuyển dụng",
+    description: "Hiệu quả xử lý YCTD, tỷ lệ hoàn thành đơn hàng, thời gian trung bình đáp ứng và năng suất điều phối",
     icon: BarChart3,
     iconBg: "from-blue-500 to-blue-600",
-    stats: "Tỷ lệ chuyển đổi: 68%",
+    stats: "Tỷ lệ hoàn thành: 68%",
     badge: "12 báo cáo",
     badgeColor: "bg-blue-50 text-blue-700 border-blue-200/80 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20",
+    link: "/orders",
   },
   {
     title: "Ứng viên",
-    description: "Phân tích ứng viên theo khu vực, kỹ năng, trình độ học vấn, kinh nghiệm làm việc và xu hướng ứng tuyển",
+    description: "Phân tích pool ứng viên theo khu vực, kỹ năng, tình trạng sẵn sàng, đánh giá và lịch sử làm việc",
     icon: Users,
     iconBg: "from-emerald-500 to-emerald-600",
-    stats: "573 ứng viên mới tháng này",
+    stats: "573 ứng viên trong pool",
     badge: "8 báo cáo",
     badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-200/80 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20",
+    link: "/workers",
   },
   {
-    title: "Doanh nghiệp",
-    description: "Hoạt động doanh nghiệp đối tác, số lượng tin tuyển dụng, tỷ lệ phản hồi và đánh giá mức độ hài lòng",
+    title: "Khách hàng",
+    description: "Hoạt động khách hàng, số lượng đơn hàng, doanh thu theo khách hàng và đánh giá mức độ hài lòng",
     icon: Building2,
     iconBg: "from-violet-500 to-violet-600",
-    stats: "48 doanh nghiệp đối tác",
+    stats: "48 khách hàng đối tác",
     badge: "6 báo cáo",
     badgeColor: "bg-violet-50 text-violet-700 border-violet-200/80 dark:bg-violet-500/10 dark:text-violet-400 dark:border-violet-500/20",
+    link: "/employers",
   },
   {
-    title: "Nhà trọ",
-    description: "Tỷ lệ lấp đầy phòng trọ, doanh thu, mức độ hài lòng của người thuê và tình trạng cơ sở vật chất",
-    icon: Home,
+    title: "Tài chính",
+    description: "Tổng hợp doanh thu, chi phí lương, lợi nhuận theo đơn hàng, công nợ khách hàng và tình trạng thanh toán",
+    icon: Wallet,
     iconBg: "from-amber-500 to-amber-600",
-    stats: "Tỷ lệ lấp đầy: 85%",
+    stats: "Doanh thu tháng: 1.2 tỷ",
     badge: "5 báo cáo",
     badgeColor: "bg-amber-50 text-amber-700 border-amber-200/80 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20",
+    link: "/payroll",
   },
 ]
 
 export function Reports() {
+  const navigate = useNavigate()
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -142,6 +150,7 @@ export function Reports() {
                       variant="ghost"
                       size="sm"
                       className="h-7 gap-1 text-[11px] font-medium text-primary hover:text-primary"
+                      onClick={() => navigate(category.link)}
                     >
                       Xem chi tiết
                       <ArrowRight className="h-3 w-3" />

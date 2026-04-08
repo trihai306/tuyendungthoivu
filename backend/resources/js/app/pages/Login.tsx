@@ -64,7 +64,7 @@ export function Login() {
             </div>
             <div>
               <span className="text-lg font-bold text-white">NVTV</span>
-              <span className="ml-1.5 text-lg text-white/70">Tuyển Dụng</span>
+              <span className="ml-1.5 text-lg text-white/70">Staffing</span>
             </div>
           </div>
 
@@ -76,22 +76,22 @@ export function Login() {
                 Hệ thống đang hoạt động
               </div>
               <h1 className="text-[42px] font-bold leading-[1.1] tracking-tight text-white">
-                Nền tảng quản lý<br />tuyển dụng<br />
+                Hệ thống quản lý<br />cung ứng nhân sự<br />
                 <span className="bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
-                  thế hệ mới
+                  thời vụ
                 </span>
               </h1>
               <p className="max-w-md text-[15px] leading-relaxed text-white/60">
-                Quản lý toàn bộ quy trình tuyển dụng, phân công công việc, theo dõi hiệu suất và quản lý nhà trọ liên kết trên một nền tảng duy nhất.
+                Quản lý toàn bộ quy trình cung ứng nhân sự - từ tiếp nhận yêu cầu, điều phối ứng viên, chấm công đến thanh toán trên một nền tảng duy nhất.
               </p>
             </div>
 
             {/* Stats */}
             <div className="flex gap-10">
               {[
-                { value: "500+", label: "Doanh nghiệp" },
-                { value: "10K+", label: "Ứng viên" },
-                { value: "98%", label: "Hài lòng" },
+                { value: "200+", label: "Khách hàng" },
+                { value: "5,000+", label: "Ứng viên" },
+                { value: "98%", label: "Đúng hạn" },
               ].map((stat) => (
                 <div key={stat.label}>
                   <p className="text-2xl font-bold text-white">{stat.value}</p>
@@ -103,7 +103,7 @@ export function Login() {
 
           {/* Footer */}
           <p className="text-xs text-white/30">
-            © 2026 NVTV Tuyển Dụng. All rights reserved.
+            © 2026 NVTV Staffing. All rights reserved.
           </p>
         </div>
       </div>
@@ -117,8 +117,8 @@ export function Login() {
               <span className="text-base font-bold text-white">NV</span>
             </div>
             <div className="text-center">
-              <p className="text-lg font-bold">NVTV Tuyển Dụng</p>
-              <p className="text-xs text-muted-foreground">Hệ thống quản lý tuyển dụng</p>
+              <p className="text-lg font-bold">NVTV Staffing</p>
+              <p className="text-xs text-muted-foreground">Hệ thống cung ứng nhân sự thời vụ</p>
             </div>
           </div>
 

@@ -25,6 +25,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   ClipboardList,
   Search,
@@ -32,9 +33,11 @@ import {
   LayoutGrid,
   List,
   Sparkles,
+  Loader2,
 } from "lucide-react"
-import type { Task, TaskType, TaskPriority, TaskStatus } from "@/types/task"
-import { mockTasks, mockUsers } from "@/data/mock-tasks"
+import type { Task, TaskType, TaskPriority, TaskStatus, TaskFilter } from "@/types/task"
+import { useTasks } from "@/hooks/use-tasks"
+import { useAuthStore } from "@/stores/auth-store"
 import { TaskCreate } from "./TaskCreate"
 
 // -- Config maps --
@@ -136,49 +139,43 @@ function formatDeadline(deadline: string): string {
 
 type TabKey = "all" | "mine" | "assigned" | "team"
 
-// Current user is u1 (Nguyen Van A) for mock purposes
-const currentUserId = "u1"
-
 export function TaskList() {
   const navigate = useNavigate()
+  const user = useAuthStore((s) => s.user)
   const [activeTab, setActiveTab] = useState<TabKey>("all")
   const [searchQuery, setSearchQuery] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const [page, setPage] = useState(1)
   const [createOpen, setCreateOpen] = useState(false)
 
-  const filteredTasks = useMemo(() => {
-    let tasks = mockTasks
-
-    // Tab filter
+  // Build filters based on active tab
+  const filters = useMemo<TaskFilter>(() => {
+    const f: TaskFilter = { page, per_page: 20 }
+    if (debouncedSearch) f.search = debouncedSearch
     switch (activeTab) {
       case "mine":
-        tasks = tasks.filter((t) => t.assigned_to.id === currentUserId)
+        if (user?.id) f.assigned_to = user.id
         break
       case "assigned":
-        tasks = tasks.filter((t) => t.assigned_by.id === currentUserId)
+        if (user?.id) f.assigned_by = user.id
         break
-      case "team": {
-        const teamIds = mockUsers.map((u) => u.id)
-        tasks = tasks.filter(
-          (t) => teamIds.includes(t.assigned_to.id) || teamIds.includes(t.assigned_by.id)
-        )
-        break
-      }
+      // "team" and "all" use no extra filter
     }
+    return f
+  }, [activeTab, debouncedSearch, page, user?.id])
 
-    // Search filter
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase()
-      tasks = tasks.filter(
-        (t) =>
-          t.title.toLowerCase().includes(q) ||
-          t.description.toLowerCase().includes(q) ||
-          t.assigned_to.name.toLowerCase().includes(q) ||
-          t.assigned_by.name.toLowerCase().includes(q)
-      )
-    }
+  const { data, isLoading, isFetching } = useTasks(filters)
+  const tasks = data?.data ?? []
+  const meta = data?.meta
 
-    return tasks
-  }, [activeTab, searchQuery])
+  // Debounce search input
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value)
+    setPage(1)
+    // Simple debounce using setTimeout
+    const timeout = setTimeout(() => setDebouncedSearch(value), 300)
+    return () => clearTimeout(timeout)
+  }
 
   const handleRowClick = (taskId: string) => {
     navigate(`/cong-viec/${taskId}`)
@@ -367,64 +364,117 @@ export function TaskList() {
           <Input
             placeholder="Tìm kiếm công việc, người thực hiện..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-9"
           />
         </div>
       </div>
 
       {/* Tabs + Table */}
-      <Tabs defaultValue="all" onValueChange={(v) => setActiveTab(v as TabKey)}>
+      <Tabs defaultValue="all" onValueChange={(v) => { setActiveTab(v as TabKey); setPage(1) }}>
         <TabsList variant="line" className="mb-4">
           <TabsTrigger value="all">
             Tất cả
-            <span className="ml-1.5 rounded-md bg-muted px-1.5 py-px text-[10px] font-semibold tabular-nums text-muted-foreground">
-              {mockTasks.length}
-            </span>
+            {meta && (
+              <span className="ml-1.5 rounded-md bg-muted px-1.5 py-px text-[10px] font-semibold tabular-nums text-muted-foreground">
+                {meta.total}
+              </span>
+            )}
           </TabsTrigger>
           <TabsTrigger value="mine">Của tôi</TabsTrigger>
           <TabsTrigger value="assigned">Tôi giao</TabsTrigger>
           <TabsTrigger value="team">Nhóm</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="all">{renderTable(filteredTasks)}</TabsContent>
-        <TabsContent value="mine">{renderTable(filteredTasks)}</TabsContent>
-        <TabsContent value="assigned">{renderTable(filteredTasks)}</TabsContent>
-        <TabsContent value="team">{renderTable(filteredTasks)}</TabsContent>
+        {isLoading ? (
+          <Card className="border-border/50 shadow-sm">
+            <CardContent className="p-6 space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <Skeleton className="h-4 w-[200px]" />
+                  <Skeleton className="h-4 w-[80px]" />
+                  <Skeleton className="h-6 w-6 rounded-full" />
+                  <Skeleton className="h-4 w-[100px]" />
+                  <Skeleton className="h-4 w-[60px]" />
+                  <Skeleton className="h-4 w-[80px]" />
+                  <Skeleton className="h-4 w-[70px] ml-auto" />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            <TabsContent value="all">{renderTable(tasks)}</TabsContent>
+            <TabsContent value="mine">{renderTable(tasks)}</TabsContent>
+            <TabsContent value="assigned">{renderTable(tasks)}</TabsContent>
+            <TabsContent value="team">{renderTable(tasks)}</TabsContent>
+          </>
+        )}
       </Tabs>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">
-          Hiển thị{" "}
-          <span className="font-medium text-foreground">
-            {filteredTasks.length}
-          </span>{" "}
-          trong tổng số{" "}
-          <span className="font-medium text-foreground">
-            {mockTasks.length}
-          </span>{" "}
-          công việc
-        </p>
-        <Pagination>
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious href="#" text="Trước" />
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationLink href="#" isActive>
-                1
-              </PaginationLink>
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationLink href="#">2</PaginationLink>
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationNext href="#" text="Sau" />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      </div>
+      {meta && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            {isFetching && <Loader2 className="mr-1.5 inline h-3 w-3 animate-spin" />}
+            Hiển thị{" "}
+            <span className="font-medium text-foreground">
+              {meta.from ?? 0}–{meta.to ?? 0}
+            </span>{" "}
+            trong tổng số{" "}
+            <span className="font-medium text-foreground">
+              {meta.total}
+            </span>{" "}
+            công việc
+          </p>
+          {meta.last_page > 1 && (
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    text="Trước"
+                    onClick={(e) => { e.preventDefault(); if (page > 1) setPage(page - 1) }}
+                    className={page <= 1 ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+                {Array.from({ length: meta.last_page }, (_, i) => i + 1)
+                  .filter((p) => p === 1 || p === meta.last_page || Math.abs(p - page) <= 1)
+                  .map((p, idx, arr) => {
+                    const items = []
+                    if (idx > 0 && arr[idx - 1] !== p - 1) {
+                      items.push(
+                        <PaginationItem key={`ellipsis-${p}`}>
+                          <span className="px-2 text-muted-foreground">...</span>
+                        </PaginationItem>
+                      )
+                    }
+                    items.push(
+                      <PaginationItem key={p}>
+                        <PaginationLink
+                          href="#"
+                          isActive={p === page}
+                          onClick={(e) => { e.preventDefault(); setPage(p) }}
+                        >
+                          {p}
+                        </PaginationLink>
+                      </PaginationItem>
+                    )
+                    return items
+                  })}
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    text="Sau"
+                    onClick={(e) => { e.preventDefault(); if (page < meta.last_page) setPage(page + 1) }}
+                    className={page >= meta.last_page ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
+        </div>
+      )}
 
       {/* Mobile FAB */}
       <div className="fixed bottom-6 right-6 sm:hidden">

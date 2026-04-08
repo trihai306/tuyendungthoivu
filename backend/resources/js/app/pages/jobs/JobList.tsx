@@ -35,26 +35,10 @@ import {
   Sparkles,
   FileSearch,
   DollarSign,
+  AlertCircle,
 } from "lucide-react"
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-type JobType = "full-time" | "part-time" | "seasonal"
-
-interface Job {
-  id: string
-  title: string
-  company: string
-  companyInitials: string
-  companyGradient: string
-  location: string
-  salaryMin: number
-  salaryMax: number
-  jobType: JobType
-  postedAt: string
-  positions: number
-  description: string
-}
+import { useJobs } from "@/hooks/use-jobs"
+import type { JobPost, JobType } from "@/types"
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -62,128 +46,50 @@ const JOB_TYPE_CONFIG: Record<
   JobType,
   { label: string; className: string }
 > = {
-  "full-time": {
-    label: "Toan thoi gian",
+  full_time: {
+    label: "Toàn thời gian",
     className:
       "bg-blue-50 text-blue-700 border-blue-200/80 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20",
   },
-  "part-time": {
-    label: "Ban thoi gian",
+  part_time: {
+    label: "Bán thời gian",
     className:
       "bg-emerald-50 text-emerald-700 border-emerald-200/80 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20",
   },
-  seasonal: {
-    label: "Thoi vu",
+  contract: {
+    label: "Hợp đồng",
     className:
       "bg-amber-50 text-amber-700 border-amber-200/80 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20",
   },
+  temporary: {
+    label: "Thời vụ",
+    className:
+      "bg-rose-50 text-rose-700 border-rose-200/80 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20",
+  },
 }
 
-// Vietnamese labels with diacritics
-const JOB_TYPE_LABELS: Record<JobType, string> = {
-  "full-time": "Toàn thời gian",
-  "part-time": "Bán thời gian",
-  seasonal: "Thời vụ",
-}
-
-function getJobTypeLabel(type: JobType): string {
-  return JOB_TYPE_LABELS[type]
-}
-
-// ─── Mock Data ───────────────────────────────────────────────────────────────
-
-const MOCK_JOBS: Job[] = [
-  {
-    id: "1",
-    title: "Nhân viên phục vụ nhà hàng",
-    company: "Công ty TNHH Thực phẩm Việt",
-    companyInitials: "TV",
-    companyGradient: "from-blue-400 to-blue-600",
-    location: "Hà Nội",
-    salaryMin: 5000000,
-    salaryMax: 8000000,
-    jobType: "full-time",
-    postedAt: "2 giờ trước",
-    positions: 5,
-    description:
-      "Tuyển nhân viên phục vụ tại nhà hàng cao cấp, yêu cầu ngoại hình khá.",
-  },
-  {
-    id: "2",
-    title: "Lễ tân khách sạn",
-    company: "Khách sạn Sunrise",
-    companyInitials: "SR",
-    companyGradient: "from-violet-400 to-violet-600",
-    location: "Đà Nẵng",
-    salaryMin: 6000000,
-    salaryMax: 10000000,
-    jobType: "full-time",
-    postedAt: "5 giờ trước",
-    positions: 3,
-    description:
-      "Tuyển lễ tân biết tiếng Anh, giao tiếp tốt, kinh nghiệm từ 1 năm.",
-  },
-  {
-    id: "3",
-    title: "Nhân viên bán hàng",
-    company: "Siêu thị MegaMart",
-    companyInitials: "MM",
-    companyGradient: "from-emerald-400 to-emerald-600",
-    location: "Hồ Chí Minh",
-    salaryMin: 4500000,
-    salaryMax: 7000000,
-    jobType: "part-time",
-    postedAt: "1 ngày trước",
-    positions: 10,
-    description:
-      "Tuyển nhân viên bán hàng làm ca linh hoạt, nhận sinh viên.",
-  },
-  {
-    id: "4",
-    title: "Phụ bếp nhà hàng",
-    company: "Nhà hàng Phố Xanh",
-    companyInitials: "PX",
-    companyGradient: "from-amber-400 to-amber-600",
-    location: "Hà Nội",
-    salaryMin: 4000000,
-    salaryMax: 6000000,
-    jobType: "full-time",
-    postedAt: "1 ngày trước",
-    positions: 2,
-    description:
-      "Tuyển phụ bếp có kinh nghiệm, chịu khó, sạch sẽ.",
-  },
-  {
-    id: "5",
-    title: "Nhân viên dọn phòng",
-    company: "Resort Biển Xanh",
-    companyInitials: "BX",
-    companyGradient: "from-rose-400 to-rose-600",
-    location: "Nha Trang",
-    salaryMin: 5000000,
-    salaryMax: 7500000,
-    jobType: "seasonal",
-    postedAt: "2 ngày trước",
-    positions: 8,
-    description:
-      "Tuyển nhân viên dọn phòng mùa cao điểm hè 2026.",
-  },
-  {
-    id: "6",
-    title: "Bảo vệ tòa nhà",
-    company: "Công ty An Ninh Sài Gòn",
-    companyInitials: "SG",
-    companyGradient: "from-cyan-400 to-cyan-600",
-    location: "Hồ Chí Minh",
-    salaryMin: 5500000,
-    salaryMax: 8000000,
-    jobType: "full-time",
-    postedAt: "3 ngày trước",
-    positions: 4,
-    description:
-      "Tuyển bảo vệ làm việc tại tòa nhà văn phòng, ca 12 tiếng.",
-  },
+// Company avatar gradient colors (cycle through for visual variety)
+const GRADIENTS = [
+  "from-blue-400 to-blue-600",
+  "from-violet-400 to-violet-600",
+  "from-emerald-400 to-emerald-600",
+  "from-amber-400 to-amber-600",
+  "from-rose-400 to-rose-600",
+  "from-cyan-400 to-cyan-600",
 ]
+
+function getGradient(index: number): string {
+  return GRADIENTS[index % GRADIENTS.length]
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0] ?? "")
+    .join("")
+    .toUpperCase()
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -193,6 +99,19 @@ function formatSalary(amount: number): string {
     return `${millions % 1 === 0 ? millions.toFixed(0) : millions.toFixed(1)} triệu`
   }
   return new Intl.NumberFormat("vi-VN").format(amount)
+}
+
+function formatTimeAgo(dateStr: string): string {
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffHours < 1) return "Vừa đăng"
+  if (diffHours < 24) return `${diffHours} giờ trước`
+  if (diffDays < 30) return `${diffDays} ngày trước`
+  return new Intl.DateTimeFormat("vi-VN").format(date)
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -222,23 +141,27 @@ function JobCardSkeleton() {
 }
 
 interface JobCardProps {
-  job: Job
+  job: JobPost
+  index: number
 }
 
-function JobCard({ job }: JobCardProps) {
-  const typeConfig = JOB_TYPE_CONFIG[job.jobType]
+function JobCard({ job, index }: JobCardProps) {
+  const typeConfig = JOB_TYPE_CONFIG[job.job_type] ?? JOB_TYPE_CONFIG.full_time
+  const companyName = job.employer?.employer_profile?.company_name ?? job.employer?.name ?? "Doanh nghiệp"
+  const gradient = getGradient(index)
+  const initials = getInitials(companyName)
 
   return (
-    <Link to={`/tin-tuyen-dung/${job.id}`} className="block">
+    <Link to={`/jobs/${job.id}`} className="block">
       <Card className="group relative overflow-hidden border-border/50 shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer">
         <CardContent className="p-5">
           {/* Header: Company avatar + info */}
           <div className="flex items-start gap-3">
             <Avatar className="h-10 w-10 rounded-xl">
               <AvatarFallback
-                className={`bg-gradient-to-br ${job.companyGradient} rounded-xl text-[10px] font-semibold text-white`}
+                className={`bg-gradient-to-br ${gradient} rounded-xl text-[10px] font-semibold text-white`}
               >
-                {job.companyInitials}
+                {initials}
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0 flex-1">
@@ -246,7 +169,7 @@ function JobCard({ job }: JobCardProps) {
                 {job.title}
               </h3>
               <p className="mt-0.5 text-[13px] text-muted-foreground truncate">
-                {job.company}
+                {companyName}
               </p>
             </div>
           </div>
@@ -255,15 +178,20 @@ function JobCard({ job }: JobCardProps) {
           <div className="mt-3 space-y-1.5">
             <div className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
               <MapPin className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{job.location}</span>
+              <span className="truncate">{job.city ?? job.location ?? "Chưa xác định"}</span>
             </div>
-            <div className="flex items-center gap-1.5 text-[13px] font-medium text-foreground">
-              <DollarSign className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <span>
-                {formatSalary(job.salaryMin)} - {formatSalary(job.salaryMax)}{" "}
-                VNĐ/tháng
-              </span>
-            </div>
+            {(job.salary_min != null || job.salary_max != null) && (
+              <div className="flex items-center gap-1.5 text-[13px] font-medium text-foreground">
+                <DollarSign className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span>
+                  {job.salary_min != null && job.salary_max != null
+                    ? `${formatSalary(job.salary_min)} - ${formatSalary(job.salary_max)} VNĐ/${job.salary_type === "hourly" ? "giờ" : job.salary_type === "daily" ? "ngày" : "tháng"}`
+                    : job.salary_min != null
+                      ? `Từ ${formatSalary(job.salary_min)} VNĐ`
+                      : `Đến ${formatSalary(job.salary_max!)} VNĐ`}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Footer: Badge + Meta */}
@@ -273,16 +201,16 @@ function JobCard({ job }: JobCardProps) {
                 variant="outline"
                 className={`rounded-md text-[11px] font-medium ${typeConfig.className}`}
               >
-                {getJobTypeLabel(job.jobType)}
+                {typeConfig.label}
               </Badge>
               <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
                 <Users className="h-3 w-3" />
-                {job.positions} vị trí
+                {job.positions_count} vị trí
               </span>
             </div>
             <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
               <Clock className="h-3 w-3" />
-              {job.postedAt}
+              {formatTimeAgo(job.created_at)}
             </span>
           </div>
         </CardContent>
@@ -307,6 +235,22 @@ function EmptyState() {
   )
 }
 
+function ErrorState({ message }: { message: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-destructive/10">
+        <AlertCircle className="h-8 w-8 text-destructive" />
+      </div>
+      <h3 className="mt-4 text-[15px] font-semibold text-foreground">
+        Có lỗi xảy ra
+      </h3>
+      <p className="mt-1 text-[13px] text-muted-foreground text-center max-w-sm">
+        {message}
+      </p>
+    </div>
+  )
+}
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export function JobList() {
@@ -316,39 +260,23 @@ export function JobList() {
   const [salaryFilter, setSalaryFilter] = useState<string>("all")
   const [currentPage, setCurrentPage] = useState(1)
 
-  // Simulated loading state
-  const isLoading = false
+  // Build filter params for API
+  const filters = {
+    page: currentPage,
+    per_page: 6,
+    ...(searchQuery ? { search: searchQuery } : {}),
+    ...(cityFilter !== "all" ? { city: cityFilter } : {}),
+    ...(typeFilter !== "all" ? { job_type: typeFilter as JobType } : {}),
+    ...(salaryFilter === "under-5m" ? { salary_max: 5000000 } : {}),
+    ...(salaryFilter === "5m-10m" ? { salary_min: 5000000, salary_max: 10000000 } : {}),
+    ...(salaryFilter === "over-10m" ? { salary_min: 10000000 } : {}),
+  }
 
-  // Filtering logic
-  const filteredJobs = MOCK_JOBS.filter((job) => {
-    const matchesSearch =
-      searchQuery === "" ||
-      job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.company.toLowerCase().includes(searchQuery.toLowerCase())
+  const { data, isLoading, isError, error } = useJobs(filters)
 
-    const matchesCity =
-      cityFilter === "all" || job.location === cityFilter
-
-    const matchesType =
-      typeFilter === "all" || job.jobType === typeFilter
-
-    const matchesSalary = (() => {
-      if (salaryFilter === "all") return true
-      if (salaryFilter === "under-5m") return job.salaryMax < 5000000
-      if (salaryFilter === "5m-10m")
-        return job.salaryMin >= 5000000 && job.salaryMax <= 10000000
-      if (salaryFilter === "over-10m") return job.salaryMin > 10000000
-      return true
-    })()
-
-    return matchesSearch && matchesCity && matchesType && matchesSalary
-  })
-
-  const totalPages = Math.max(1, Math.ceil(filteredJobs.length / 6))
-  const paginatedJobs = filteredJobs.slice(
-    (currentPage - 1) * 6,
-    currentPage * 6
-  )
+  const jobs = data?.data ?? []
+  const totalItems = data?.meta?.total ?? 0
+  const totalPages = data?.meta?.last_page ?? 1
 
   return (
     <div className="space-y-6">
@@ -437,9 +365,10 @@ export function JobList() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tất cả loại</SelectItem>
-            <SelectItem value="full-time">Toàn thời gian</SelectItem>
-            <SelectItem value="part-time">Bán thời gian</SelectItem>
-            <SelectItem value="seasonal">Thời vụ</SelectItem>
+            <SelectItem value="full_time">Toàn thời gian</SelectItem>
+            <SelectItem value="part_time">Bán thời gian</SelectItem>
+            <SelectItem value="contract">Hợp đồng</SelectItem>
+            <SelectItem value="temporary">Thời vụ</SelectItem>
           </SelectContent>
         </Select>
 
@@ -467,7 +396,7 @@ export function JobList() {
         <p className="text-[13px] text-muted-foreground">
           Tìm thấy{" "}
           <span className="font-semibold text-foreground">
-            {filteredJobs.length}
+            {totalItems}
           </span>{" "}
           tin tuyển dụng
         </p>
@@ -480,12 +409,14 @@ export function JobList() {
             <JobCardSkeleton key={i} />
           ))}
         </div>
-      ) : paginatedJobs.length === 0 ? (
+      ) : isError ? (
+        <ErrorState message={error?.message ?? "Không thể tải danh sách tin tuyển dụng."} />
+      ) : jobs.length === 0 ? (
         <EmptyState />
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {paginatedJobs.map((job) => (
-            <JobCard key={job.id} job={job} />
+          {jobs.map((job, index) => (
+            <JobCard key={job.id} job={job} index={index} />
           ))}
         </div>
       )}

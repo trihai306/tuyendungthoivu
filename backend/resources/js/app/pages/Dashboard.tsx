@@ -18,331 +18,221 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
-  FileText,
+  ClipboardList,
   Users,
-  ClipboardCheck,
-  UserPlus,
+  Route,
+  Banknote,
   ArrowRight,
   Clock,
   ArrowUpRight,
   ArrowDownRight,
-  ListTodo,
-  Sparkles,
-  Star,
-  CalendarDays,
   Activity,
   Shield,
+  MapPin,
+  CalendarClock,
+  CircleCheck,
+  CirclePause,
+  CircleOff,
+  CircleDot,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
+import { useNavigate } from "react-router-dom"
+import { useAuthStore } from "@/stores/auth-store"
+import type { UserRole } from "@/types"
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-interface StatItem {
+interface KpiCard {
   title: string
   value: string
   change: string
-  changeType: "positive" | "negative" | "neutral"
+  changeType: "positive" | "negative"
   icon: LucideIcon
-  description: string
+  accentColor: string
   iconBg: string
 }
 
-interface RecentTask {
-  id: string
-  title: string
-  assignee: { name: string; initials: string; avatarBg: string }
-  type: string
-  priority: "Cao" | "Trung bình" | "Thấp"
-  deadline: string
-  status: "Hoàn thành" | "Đang xử lý" | "Quá hạn" | "Chờ duyệt" | "Mới giao"
+type OrderStatus = "Mới" | "Đang xử lý" | "Đã điều phối" | "Hoàn thành" | "Huỷ"
+
+interface RecentOrder {
+  code: string
+  customer: string
+  position: string
+  quantity: number
+  status: OrderStatus
+  createdAt: string
 }
 
 interface ActivityItem {
   id: string
   actor: { name: string; initials: string; avatarBg: string }
-  action: string
-  target: string
+  description: string
   timeAgo: string
 }
 
-interface EmployeePerformance {
-  name: string
-  initials: string
-  avatarBg: string
-  role: string
-  roleBadge: string
-  tasksCompleted: number
-  tasksTotal: number
-  rating: number
+type DispatchStatus = "Đã xác nhận" | "Chờ xác nhận" | "Đang di chuyển"
+
+interface DispatchItem {
+  customer: string
+  position: string
+  workers: number
+  checkInTime: string
+  location: string
+  status: DispatchStatus
 }
 
-interface ScheduleEvent {
-  time: string
-  title: string
-  subtitle: string
-  assignee: { name: string; initials: string; avatarBg: string }
-  dotColor: string
+interface WorkerStatusGroup {
+  label: string
+  count: number
+  icon: LucideIcon
+  color: string
+  bgColor: string
+  barColor: string
 }
 
 // ---------------------------------------------------------------------------
 // Mock Data
 // ---------------------------------------------------------------------------
 
-const stats: StatItem[] = [
+const kpiCards: KpiCard[] = [
   {
-    title: "Tổng nhân viên",
-    value: "32",
-    change: "+3",
+    title: "YCTD đang xử lý",
+    value: "24",
+    change: "+12%",
     changeType: "positive",
-    icon: Users,
-    description: "tháng này",
+    icon: ClipboardList,
+    accentColor: "border-l-blue-500",
     iconBg: "from-blue-500 to-blue-600",
   },
   {
-    title: "Công việc đang xử lý",
-    value: "18",
-    change: "5 quá hạn",
-    changeType: "negative",
-    icon: ClipboardCheck,
-    description: "",
-    iconBg: "from-amber-500 to-amber-600",
-  },
-  {
-    title: "Tin tuyển dụng",
-    value: "124",
-    change: "+12%",
-    changeType: "positive",
-    icon: FileText,
-    description: "so với tháng trước",
-    iconBg: "from-violet-500 to-violet-600",
-  },
-  {
-    title: "Ứng viên mới",
-    value: "573",
+    title: "Ứng viên đang làm việc",
+    value: "186",
     change: "+8%",
     changeType: "positive",
-    icon: UserPlus,
-    description: "so với tháng trước",
+    icon: Users,
+    accentColor: "border-l-emerald-500",
     iconBg: "from-emerald-500 to-emerald-600",
+  },
+  {
+    title: "Cần điều phối hôm nay",
+    value: "37",
+    change: "+5",
+    changeType: "negative",
+    icon: Route,
+    accentColor: "border-l-orange-500",
+    iconBg: "from-orange-500 to-orange-600",
+  },
+  {
+    title: "Doanh thu tháng",
+    value: "1,28 tỷ",
+    change: "+18%",
+    changeType: "positive",
+    icon: Banknote,
+    accentColor: "border-l-violet-500",
+    iconBg: "from-violet-500 to-violet-600",
   },
 ]
 
-const recentTasks: RecentTask[] = [
-  {
-    id: "1",
-    title: "Duyệt hồ sơ ứng viên vị trí Kỹ sư phần mềm",
-    assignee: { name: "Trần Thị Mai", initials: "TM", avatarBg: "from-pink-400 to-pink-600" },
-    type: "Tuyển dụng",
-    priority: "Cao",
-    deadline: "07/04/2026",
-    status: "Đang xử lý",
-  },
-  {
-    id: "2",
-    title: "Sắp xếp phỏng vấn vòng 2 - Nguyễn Văn Hùng",
-    assignee: { name: "Lê Hoàng Nam", initials: "LN", avatarBg: "from-blue-400 to-blue-600" },
-    type: "Phỏng vấn",
-    priority: "Cao",
-    deadline: "06/04/2026",
-    status: "Quá hạn",
-  },
-  {
-    id: "3",
-    title: "Cập nhật JD vị trí Trưởng phòng Marketing",
-    assignee: { name: "Phạm Thùy Dung", initials: "PD", avatarBg: "from-violet-400 to-violet-600" },
-    type: "Nội bộ",
-    priority: "Trung bình",
-    deadline: "10/04/2026",
-    status: "Mới giao",
-  },
-  {
-    id: "4",
-    title: "Kiểm tra hợp đồng lao động - 5 nhân viên mới",
-    assignee: { name: "Nguyễn Minh Tuấn", initials: "NT", avatarBg: "from-emerald-400 to-emerald-600" },
-    type: "Hợp đồng",
-    priority: "Trung bình",
-    deadline: "09/04/2026",
-    status: "Chờ duyệt",
-  },
-  {
-    id: "5",
-    title: "Báo cáo tuyển dụng quý I/2026",
-    assignee: { name: "Trần Văn Bình", initials: "TB", avatarBg: "from-amber-400 to-amber-600" },
-    type: "Báo cáo",
-    priority: "Thấp",
-    deadline: "15/04/2026",
-    status: "Hoàn thành",
-  },
+const recentOrders: RecentOrder[] = [
+  { code: "ORD-031", customer: "Cty TNHH Logistic VN", position: "Bốc xếp hàng", quantity: 12, status: "Mới", createdAt: "08/04/2026" },
+  { code: "ORD-030", customer: "KCN Bình Dương III", position: "Công nhân sản xuất", quantity: 25, status: "Đang xử lý", createdAt: "07/04/2026" },
+  { code: "ORD-029", customer: "Siêu thị BigC Tân Phú", position: "Nhân viên kho", quantity: 8, status: "Đã điều phối", createdAt: "07/04/2026" },
+  { code: "ORD-028", customer: "Cty CP Thực phẩm Saigon", position: "Đóng gói", quantity: 15, status: "Đang xử lý", createdAt: "06/04/2026" },
+  { code: "ORD-027", customer: "KCN Amata Đồng Nai", position: "Lắp ráp linh kiện", quantity: 30, status: "Hoàn thành", createdAt: "05/04/2026" },
+  { code: "ORD-026", customer: "Cty TNHH May mặc ABC", position: "May công nghiệp", quantity: 20, status: "Đã điều phối", createdAt: "05/04/2026" },
 ]
 
 const activityFeed: ActivityItem[] = [
   {
     id: "1",
-    actor: { name: "Trần Thị Mai", initials: "TM", avatarBg: "from-pink-400 to-pink-600" },
-    action: "đã duyệt hồ sơ",
-    target: "Nguyễn Thị Hồng Nhung",
+    actor: { name: "Nguyễn Văn A", initials: "NA", avatarBg: "from-blue-400 to-blue-600" },
+    description: "đã xác nhận điều phối 5 ứng viên cho Đơn #ORD-029",
     timeAgo: "5 phút trước",
   },
   {
     id: "2",
-    actor: { name: "Lê Hoàng Nam", initials: "LN", avatarBg: "from-blue-400 to-blue-600" },
-    action: "đã hoàn thành phỏng vấn",
-    target: "Phạm Quốc Đạt",
+    actor: { name: "Trần Thị Mai", initials: "TM", avatarBg: "from-pink-400 to-pink-600" },
+    description: "đã tiếp nhận yêu cầu mới #ORD-031 từ Logistic VN",
     timeAgo: "23 phút trước",
   },
   {
     id: "3",
-    actor: { name: "Nguyễn Minh Tuấn", initials: "NT", avatarBg: "from-emerald-400 to-emerald-600" },
-    action: "đã giao việc cho",
-    target: "Phạm Thùy Dung",
+    actor: { name: "Lê Hoàng Nam", initials: "LN", avatarBg: "from-emerald-400 to-emerald-600" },
+    description: "đã cập nhật trạng thái 12 ứng viên tại KCN Bình Dương",
     timeAgo: "1 giờ trước",
   },
   {
     id: "4",
-    actor: { name: "Phạm Thùy Dung", initials: "PD", avatarBg: "from-violet-400 to-violet-600" },
-    action: "đã cập nhật trạng thái",
-    target: "Tin tuyển dụng #1042",
+    actor: { name: "Phạm Thuỳ Dung", initials: "PD", avatarBg: "from-violet-400 to-violet-600" },
+    description: "đã hoàn thành đối soát chấm công tháng 3/2026",
     timeAgo: "2 giờ trước",
   },
   {
     id: "5",
-    actor: { name: "Trần Văn Bình", initials: "TB", avatarBg: "from-amber-400 to-amber-600" },
-    action: "đã từ chối hồ sơ",
-    target: "Lê Văn Khánh",
+    actor: { name: "Nguyễn Minh Tuấn", initials: "NT", avatarBg: "from-amber-400 to-amber-600" },
+    description: "đã gửi báo giá cho Cty CP Thực phẩm Saigon",
     timeAgo: "3 giờ trước",
   },
   {
     id: "6",
     actor: { name: "Đỗ Thị Lan", initials: "ĐL", avatarBg: "from-rose-400 to-rose-600" },
-    action: "đã tạo lịch phỏng vấn với",
-    target: "Hoàng Minh Châu",
+    description: "đã thêm 3 ứng viên mới vào hệ thống",
     timeAgo: "4 giờ trước",
   },
-  {
-    id: "7",
-    actor: { name: "Lê Hoàng Nam", initials: "LN", avatarBg: "from-blue-400 to-blue-600" },
-    action: "đã gửi thư mời nhận việc cho",
-    target: "Vũ Thị Thanh",
-    timeAgo: "5 giờ trước",
-  },
-  {
-    id: "8",
-    actor: { name: "Trần Thị Mai", initials: "TM", avatarBg: "from-pink-400 to-pink-600" },
-    action: "đã hoàn thành báo cáo",
-    target: "Tuyển dụng tháng 3",
-    timeAgo: "hôm qua",
-  },
 ]
 
-const employeePerformance: EmployeePerformance[] = [
-  {
-    name: "Trần Thị Mai",
-    initials: "TM",
-    avatarBg: "from-pink-400 to-pink-600",
-    role: "Chuyên viên tuyển dụng",
-    roleBadge: "bg-pink-50 text-pink-700 border-pink-200/80 dark:bg-pink-500/10 dark:text-pink-400 dark:border-pink-500/20",
-    tasksCompleted: 28,
-    tasksTotal: 30,
-    rating: 4.9,
-  },
-  {
-    name: "Lê Hoàng Nam",
-    initials: "LN",
-    avatarBg: "from-blue-400 to-blue-600",
-    role: "Trưởng nhóm HR",
-    roleBadge: "bg-blue-50 text-blue-700 border-blue-200/80 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20",
-    tasksCompleted: 25,
-    tasksTotal: 30,
-    rating: 4.7,
-  },
-  {
-    name: "Phạm Thùy Dung",
-    initials: "PD",
-    avatarBg: "from-violet-400 to-violet-600",
-    role: "Chuyên viên tuyển dụng",
-    roleBadge: "bg-violet-50 text-violet-700 border-violet-200/80 dark:bg-violet-500/10 dark:text-violet-400 dark:border-violet-500/20",
-    tasksCompleted: 22,
-    tasksTotal: 30,
-    rating: 4.5,
-  },
-  {
-    name: "Nguyễn Minh Tuấn",
-    initials: "NT",
-    avatarBg: "from-emerald-400 to-emerald-600",
-    role: "Chuyên viên hợp đồng",
-    roleBadge: "bg-emerald-50 text-emerald-700 border-emerald-200/80 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20",
-    tasksCompleted: 20,
-    tasksTotal: 30,
-    rating: 4.3,
-  },
-  {
-    name: "Trần Văn Bình",
-    initials: "TB",
-    avatarBg: "from-amber-400 to-amber-600",
-    role: "Nhân viên hành chính",
-    roleBadge: "bg-amber-50 text-amber-700 border-amber-200/80 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20",
-    tasksCompleted: 18,
-    tasksTotal: 30,
-    rating: 4.1,
-  },
+const dispatchItems: DispatchItem[] = [
+  { customer: "Cty TNHH Logistic VN", position: "Bốc xếp hàng", workers: 8, checkInTime: "06:00", location: "Q. Bình Tân", status: "Đã xác nhận" },
+  { customer: "KCN Bình Dương III", position: "Công nhân SX", workers: 15, checkInTime: "07:00", location: "Bình Dương", status: "Đang di chuyển" },
+  { customer: "Siêu thị BigC Tân Phú", position: "Nhân viên kho", workers: 6, checkInTime: "07:30", location: "Q. Tân Phú", status: "Chờ xác nhận" },
+  { customer: "Cty CP Thực phẩm SG", position: "Đóng gói", workers: 10, checkInTime: "08:00", location: "Q.12", status: "Chờ xác nhận" },
 ]
 
-const todaySchedule: ScheduleEvent[] = [
-  {
-    time: "09:00",
-    title: "Phỏng vấn vòng 1 - Trần Quốc Bảo",
-    subtitle: "Kỹ sư phần mềm",
-    assignee: { name: "Lê Hoàng Nam", initials: "LN", avatarBg: "from-blue-400 to-blue-600" },
-    dotColor: "bg-blue-500",
-  },
-  {
-    time: "10:30",
-    title: "Họp đánh giá ứng viên tuần",
-    subtitle: "Phòng họp A3 - 8 người",
-    assignee: { name: "Trần Thị Mai", initials: "TM", avatarBg: "from-pink-400 to-pink-600" },
-    dotColor: "bg-violet-500",
-  },
-  {
-    time: "14:00",
-    title: "Review hồ sơ vị trí Kế toán",
-    subtitle: "12 hồ sơ mới",
-    assignee: { name: "Phạm Thùy Dung", initials: "PD", avatarBg: "from-violet-400 to-violet-600" },
-    dotColor: "bg-emerald-500",
-  },
-  {
-    time: "15:30",
-    title: "Phỏng vấn vòng 2 - Nguyễn Thị Hồng",
-    subtitle: "Quản lý dự án",
-    assignee: { name: "Nguyễn Minh Tuấn", initials: "NT", avatarBg: "from-emerald-400 to-emerald-600" },
-    dotColor: "bg-amber-500",
-  },
+const workerStatusGroups: WorkerStatusGroup[] = [
+  { label: "Sẵn sàng", count: 94, icon: CircleCheck, color: "text-emerald-600 dark:text-emerald-400", bgColor: "bg-emerald-50 dark:bg-emerald-500/10", barColor: "bg-emerald-500" },
+  { label: "Đang làm việc", count: 186, icon: CircleDot, color: "text-blue-600 dark:text-blue-400", bgColor: "bg-blue-50 dark:bg-blue-500/10", barColor: "bg-blue-500" },
+  { label: "Tạm nghỉ", count: 23, icon: CirclePause, color: "text-amber-600 dark:text-amber-400", bgColor: "bg-amber-50 dark:bg-amber-500/10", barColor: "bg-amber-500" },
+  { label: "Hết hợp đồng", count: 12, icon: CircleOff, color: "text-gray-500 dark:text-gray-400", bgColor: "bg-gray-50 dark:bg-gray-500/10", barColor: "bg-gray-400" },
 ]
 
 // ---------------------------------------------------------------------------
-// Status / Priority config
+// Status configs
 // ---------------------------------------------------------------------------
 
-const taskStatusConfig: Record<RecentTask["status"], string> = {
-  "Hoàn thành": "bg-emerald-50 text-emerald-700 border-emerald-200/80 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20",
+const orderStatusConfig: Record<OrderStatus, string> = {
+  "Mới": "bg-violet-50 text-violet-700 border-violet-200/80 dark:bg-violet-500/10 dark:text-violet-400 dark:border-violet-500/20",
   "Đang xử lý": "bg-blue-50 text-blue-700 border-blue-200/80 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20",
-  "Quá hạn": "bg-red-50 text-red-600 border-red-200/80 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20",
-  "Chờ duyệt": "bg-amber-50 text-amber-700 border-amber-200/80 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20",
-  "Mới giao": "bg-violet-50 text-violet-700 border-violet-200/80 dark:bg-violet-500/10 dark:text-violet-400 dark:border-violet-500/20",
+  "Đã điều phối": "bg-amber-50 text-amber-700 border-amber-200/80 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20",
+  "Hoàn thành": "bg-emerald-50 text-emerald-700 border-emerald-200/80 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20",
+  "Huỷ": "bg-red-50 text-red-600 border-red-200/80 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20",
 }
 
-const priorityConfig: Record<RecentTask["priority"], string> = {
-  "Cao": "bg-red-50 text-red-600 border-red-200/80 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20",
-  "Trung bình": "bg-amber-50 text-amber-700 border-amber-200/80 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20",
-  "Thấp": "bg-gray-50 text-gray-600 border-gray-200/80 dark:bg-gray-500/10 dark:text-gray-400 dark:border-gray-500/20",
+const dispatchStatusConfig: Record<DispatchStatus, string> = {
+  "Đã xác nhận": "bg-emerald-50 text-emerald-700 border-emerald-200/80 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20",
+  "Chờ xác nhận": "bg-amber-50 text-amber-700 border-amber-200/80 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20",
+  "Đang di chuyển": "bg-blue-50 text-blue-700 border-blue-200/80 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20",
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
+const roleLabels: Record<UserRole, string> = {
+  admin: "Quản trị viên",
+  employer: "Nhà tuyển dụng",
+  worker: "Nhân viên",
+}
+
 export function Dashboard() {
+  const navigate = useNavigate()
+  const user = useAuthStore((s) => s.user)
+  const userName = user?.name ?? "Người dùng"
+  const userRole = user?.role ? roleLabels[user.role] : "Người dùng"
+
+  const totalWorkers = workerStatusGroups.reduce((sum, g) => sum + g.count, 0)
+
   return (
     <div className="space-y-6">
       {/* ================================================================= */}
@@ -354,26 +244,21 @@ export function Dashboard() {
 
         <div className="relative flex items-center justify-between">
           <div>
-            <div className="mb-1 flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-white/80" />
-              <span className="text-xs font-medium text-white/70 uppercase tracking-wider">
-                Hệ thống quản lý nội bộ
-              </span>
-            </div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold">Xin chào, Nguyễn Văn A</h1>
+            <span className="text-xs font-medium text-white/70 uppercase tracking-wider">
+              Hệ thống cung ứng nhân sự thời vụ
+            </span>
+            <div className="mt-1 flex items-center gap-3">
+              <h1 className="text-xl font-semibold">Xin chào, {userName}</h1>
               <Badge className="bg-white/20 text-white border-white/30 text-[11px]">
                 <Shield className="mr-1 h-3 w-3" />
-                Quản trị viên
+                {userRole}
               </Badge>
             </div>
             <p className="mt-1.5 text-sm text-white/70">
               Hôm nay có{" "}
-              <span className="font-medium text-white">12 công việc</span> cần
-              xử lý,{" "}
-              <span className="font-medium text-white">3 phỏng vấn</span> và{" "}
-              <span className="font-medium text-white">8 hồ sơ</span> chờ
-              duyệt.
+              <span className="font-medium text-white">37 ứng viên</span> cần điều phối,{" "}
+              <span className="font-medium text-white">4 yêu cầu</span> cần xử lý và{" "}
+              <span className="font-medium text-white">186 ứng viên</span> đang làm việc.
             </p>
           </div>
           <div className="hidden sm:flex gap-2">
@@ -381,64 +266,62 @@ export function Dashboard() {
               size="sm"
               variant="secondary"
               className="bg-white/15 text-white border-white/20 hover:bg-white/25 backdrop-blur-sm"
+              onClick={() => navigate("/dispatch")}
             >
-              <ListTodo className="mr-1.5 h-3.5 w-3.5" />
-              Giao việc mới
+              <Route className="mr-1.5 h-3.5 w-3.5" />
+              Điều phối
             </Button>
             <Button
               size="sm"
               className="bg-white text-primary hover:bg-white/90 shadow-sm"
+              onClick={() => navigate("/orders/create")}
             >
-              <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" />
-              Duyệt hồ sơ
+              <ClipboardList className="mr-1.5 h-3.5 w-3.5" />
+              Yêu cầu mới
             </Button>
           </div>
         </div>
       </div>
 
       {/* ================================================================= */}
-      {/* Row 1: Overview Stats                                             */}
+      {/* Row 1: KPI Cards                                                  */}
       {/* ================================================================= */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
+        {kpiCards.map((card) => (
           <Card
-            key={stat.title}
-            className="group relative overflow-hidden border-border/50 shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
+            key={card.title}
+            className={`group relative overflow-hidden border-l-4 ${card.accentColor} border-border/50 shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5`}
           >
             <CardContent className="p-5">
               <div className="flex items-start justify-between">
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <p className="text-[13px] font-medium text-muted-foreground">
-                    {stat.title}
+                    {card.title}
                   </p>
-                  <div>
-                    <span className="text-[28px] font-semibold tracking-tight leading-none">
-                      {stat.value}
-                    </span>
-                  </div>
+                  <span className="block text-[28px] font-semibold tracking-tight leading-none">
+                    {card.value}
+                  </span>
                   <div className="flex items-center gap-1.5">
-                    {stat.changeType === "negative" ? (
-                      <span className="flex items-center gap-0.5 rounded-md bg-red-50 px-1.5 py-0.5 text-[11px] font-semibold text-red-600 dark:bg-red-500/10 dark:text-red-400">
-                        <ArrowDownRight className="h-3 w-3" />
-                        {stat.change}
-                      </span>
-                    ) : (
+                    {card.changeType === "positive" ? (
                       <span className="flex items-center gap-0.5 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
                         <ArrowUpRight className="h-3 w-3" />
-                        {stat.change}
+                        {card.change}
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-0.5 rounded-md bg-red-50 px-1.5 py-0.5 text-[11px] font-semibold text-red-600 dark:bg-red-500/10 dark:text-red-400">
+                        <ArrowDownRight className="h-3 w-3" />
+                        {card.change}
                       </span>
                     )}
-                    {stat.description && (
-                      <span className="text-[11px] text-muted-foreground">
-                        {stat.description}
-                      </span>
-                    )}
+                    <span className="text-[11px] text-muted-foreground">
+                      so với tháng trước
+                    </span>
                   </div>
                 </div>
                 <div
-                  className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${stat.iconBg} shadow-sm`}
+                  className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${card.iconBg} shadow-sm`}
                 >
-                  <stat.icon className="h-5 w-5 text-white" />
+                  <card.icon className="h-5 w-5 text-white" />
                 </div>
               </div>
             </CardContent>
@@ -447,19 +330,19 @@ export function Dashboard() {
       </div>
 
       {/* ================================================================= */}
-      {/* Row 2: Recent Tasks + Activity Feed                               */}
+      {/* Row 2: Recent Orders + Activity Feed                              */}
       {/* ================================================================= */}
       <div className="grid gap-4 lg:grid-cols-5">
-        {/* Recent Tasks - col-span-3 */}
-        <Card className="border-border/50 shadow-sm lg:col-span-3">
+        {/* Recent Orders - col-span-3 (60%) */}
+        <Card className="border-border/50 shadow-sm lg:col-span-3 overflow-hidden">
           <CardHeader className="pb-0">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-[15px] font-semibold">
-                  Công việc gần đây
+                  Yêu cầu gần đây
                 </CardTitle>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Các công việc được giao và cập nhật mới nhất
+                  Các yêu cầu tuyển dụng nhân sự mới nhất
                 </p>
               </div>
               <CardAction>
@@ -467,6 +350,7 @@ export function Dashboard() {
                   variant="ghost"
                   size="sm"
                   className="h-8 gap-1.5 text-xs font-medium text-primary hover:text-primary"
+                  onClick={() => navigate("/orders")}
                 >
                   Xem tất cả
                   <ArrowRight className="h-3 w-3" />
@@ -475,105 +359,95 @@ export function Dashboard() {
             </div>
           </CardHeader>
           <CardContent className="p-0 pt-2">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="h-10 pl-6 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-                    Tiêu đề
-                  </TableHead>
-                  <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-                    Người thực hiện
-                  </TableHead>
-                  <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-                    Loại
-                  </TableHead>
-                  <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-                    Ưu tiên
-                  </TableHead>
-                  <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-                    Hạn chót
-                  </TableHead>
-                  <TableHead className="h-10 pr-6 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-                    Trạng thái
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentTasks.map((task) => (
-                  <TableRow
-                    key={task.id}
-                    className="group cursor-pointer border-0 transition-colors hover:bg-muted/40"
-                  >
-                    <TableCell className="py-3 pl-6 max-w-[220px]">
-                      <span className="text-[13px] font-medium truncate block">
-                        {task.title}
-                      </span>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <div className="flex items-center gap-2">
-                        <Avatar size="sm">
-                          <AvatarFallback
-                            className={`bg-gradient-to-br ${task.assignee.avatarBg} text-[9px] font-semibold text-white`}
-                          >
-                            {task.assignee.initials}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-[12px] text-muted-foreground">
-                          {task.assignee.name}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <span className="text-[12px] text-muted-foreground">
-                        {task.type}
-                      </span>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <Badge
-                        variant="outline"
-                        className={`rounded-md text-[11px] font-medium ${priorityConfig[task.priority]}`}
-                      >
-                        {task.priority}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <span className="text-[12px] text-muted-foreground tabular-nums">
-                        {task.deadline}
-                      </span>
-                    </TableCell>
-                    <TableCell className="py-3 pr-6 text-right">
-                      <Badge
-                        variant="outline"
-                        className={`rounded-md text-[11px] font-medium ${taskStatusConfig[task.status]}`}
-                      >
-                        {task.status}
-                      </Badge>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="h-10 pl-6 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                      Mã đơn
+                    </TableHead>
+                    <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                      Khách hàng
+                    </TableHead>
+                    <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                      Vị trí
+                    </TableHead>
+                    <TableHead className="h-10 text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                      SL
+                    </TableHead>
+                    <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                      Ngày tạo
+                    </TableHead>
+                    <TableHead className="h-10 pr-6 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                      Trạng thái
+                    </TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {recentOrders.map((order) => (
+                    <TableRow
+                      key={order.code}
+                      className="group cursor-pointer border-0 transition-colors hover:bg-muted/40"
+                      onClick={() => navigate(`/orders/${order.code}`)}
+                    >
+                      <TableCell className="py-3 pl-6">
+                        <span className="text-[13px] font-semibold text-primary">
+                          {order.code}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <span className="text-[13px] font-medium">
+                          {order.customer}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <span className="text-[12px] text-muted-foreground">
+                          {order.position}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-3 text-center">
+                        <span className="text-[13px] font-semibold tabular-nums">
+                          {order.quantity}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <span className="text-[12px] text-muted-foreground tabular-nums">
+                          {order.createdAt}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-3 pr-6 text-right">
+                        <Badge
+                          variant="outline"
+                          className={`rounded-md text-[11px] font-medium ${orderStatusConfig[order.status]}`}
+                        >
+                          {order.status}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Activity Feed - col-span-2 */}
+        {/* Activity Feed - col-span-2 (40%) */}
         <Card className="border-border/50 shadow-sm lg:col-span-2">
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-[15px] font-semibold flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-muted-foreground" />
-                  Hoạt động nhóm
-                </CardTitle>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Cập nhật mới nhất từ các thành viên
-                </p>
-              </div>
+            <div>
+              <CardTitle className="text-[15px] font-semibold flex items-center gap-2">
+                <Activity className="h-4 w-4 text-muted-foreground" />
+                Hoạt động gần đây
+              </CardTitle>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Cập nhật mới nhất từ hệ thống
+              </p>
             </div>
           </CardHeader>
           <CardContent className="px-0">
             <ScrollArea className="h-[340px] px-4">
               <div className="relative space-y-0">
+                {/* Vertical timeline line */}
                 <div className="absolute left-[19px] top-3 bottom-3 w-px bg-border" />
 
                 {activityFeed.map((item) => (
@@ -592,9 +466,8 @@ export function Dashboard() {
                       <p className="text-[13px] leading-snug">
                         <span className="font-medium">{item.actor.name}</span>{" "}
                         <span className="text-muted-foreground">
-                          {item.action}
-                        </span>{" "}
-                        <span className="font-medium">{item.target}</span>
+                          {item.description}
+                        </span>
                       </p>
                       <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
                         <Clock className="h-3 w-3" />
@@ -610,19 +483,20 @@ export function Dashboard() {
       </div>
 
       {/* ================================================================= */}
-      {/* Row 3: Performance + Schedule                                     */}
+      {/* Row 3: Dispatch Today + Worker Status                             */}
       {/* ================================================================= */}
       <div className="grid gap-4 lg:grid-cols-5">
-        {/* Employee Performance - col-span-3 */}
+        {/* Dispatch Today - col-span-3 */}
         <Card className="border-border/50 shadow-sm lg:col-span-3">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-[15px] font-semibold">
-                  Hiệu suất nhân viên
+                <CardTitle className="text-[15px] font-semibold flex items-center gap-2">
+                  <CalendarClock className="h-4 w-4 text-muted-foreground" />
+                  Điều phối hôm nay
                 </CardTitle>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Nhân viên xuất sắc tháng này
+                  {dispatchItems.length} ca làm việc cần điều phối
                 </p>
               </div>
               <CardAction>
@@ -630,76 +504,74 @@ export function Dashboard() {
                   variant="ghost"
                   size="sm"
                   className="h-8 gap-1.5 text-xs font-medium text-primary hover:text-primary"
+                  onClick={() => navigate("/dispatch")}
                 >
-                  Xem chi tiết
+                  Xem tất cả
                   <ArrowRight className="h-3 w-3" />
                 </Button>
               </CardAction>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {employeePerformance.map((emp, index) => (
+            <div className="space-y-3">
+              {dispatchItems.map((item, i) => (
                 <div
-                  key={emp.name}
-                  className="flex items-center gap-4"
+                  key={i}
+                  className="rounded-lg border border-border/50 p-3.5 transition-colors hover:bg-muted/30"
                 >
-                  {/* Rank */}
-                  <span className="w-5 text-center text-[13px] font-semibold text-muted-foreground tabular-nums">
-                    {index + 1}
-                  </span>
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    {/* Check-in time */}
+                    <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-lg bg-muted/60">
+                      <span className="text-[15px] font-bold tabular-nums leading-tight">
+                        {item.checkInTime}
+                      </span>
+                    </div>
 
-                  {/* Avatar */}
-                  <Avatar>
-                    <AvatarFallback
-                      className={`bg-gradient-to-br ${emp.avatarBg} text-[10px] font-semibold text-white`}
-                    >
-                      {emp.initials}
-                    </AvatarFallback>
-                  </Avatar>
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium truncate">
+                        {item.customer}
+                      </p>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                        <span>{item.position}</span>
+                        <span className="flex items-center gap-0.5">
+                          <MapPin className="h-3 w-3" />
+                          {item.location}
+                        </span>
+                      </div>
+                    </div>
 
-                  {/* Name + Role */}
-                  <div className="min-w-0 flex-shrink-0 w-[180px]">
-                    <p className="text-[13px] font-medium truncate">
-                      {emp.name}
-                    </p>
+                    {/* Worker count + Status - hidden on mobile, shown on sm+ */}
+                    <div className="hidden sm:flex items-center gap-3">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-[13px] font-semibold tabular-nums">
+                          {item.workers}
+                        </span>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={`shrink-0 rounded-md text-[11px] font-medium ${dispatchStatusConfig[item.status]}`}
+                      >
+                        {item.status}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {/* Mobile: worker count + status on second row */}
+                  <div className="flex sm:hidden items-center justify-between mt-2 ml-15">
+                    <div className="flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-[12px] font-semibold tabular-nums">
+                        {item.workers} ứng viên
+                      </span>
+                    </div>
                     <Badge
                       variant="outline"
-                      className={`mt-0.5 rounded-md text-[10px] font-medium ${emp.roleBadge}`}
+                      className={`rounded-md text-[11px] font-medium ${dispatchStatusConfig[item.status]}`}
                     >
-                      {emp.role}
+                      {item.status}
                     </Badge>
-                  </div>
-
-                  {/* Progress Bar */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11px] text-muted-foreground">
-                        {emp.tasksCompleted}/{emp.tasksTotal} công việc
-                      </span>
-                      <span className="text-[11px] font-medium">
-                        {Math.round(
-                          (emp.tasksCompleted / emp.tasksTotal) * 100
-                        )}
-                        %
-                      </span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-muted">
-                      <div
-                        className="h-2 rounded-full bg-gradient-to-r from-primary to-primary/80 transition-all duration-500"
-                        style={{
-                          width: `${(emp.tasksCompleted / emp.tasksTotal) * 100}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Rating */}
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                    <span className="text-[13px] font-semibold tabular-nums">
-                      {emp.rating}
-                    </span>
                   </div>
                 </div>
               ))}
@@ -707,71 +579,67 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Today Schedule - col-span-2 */}
+        {/* Worker Status - col-span-2 */}
         <Card className="border-border/50 shadow-sm lg:col-span-2">
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-[15px] font-semibold flex items-center gap-2">
-                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                  Lịch hôm nay
-                </CardTitle>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {todaySchedule.length} hoạt động sắp tới
-                </p>
-              </div>
-              <CardAction>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 gap-1.5 text-xs font-medium text-primary hover:text-primary"
-                >
-                  Xem lịch
-                  <ArrowRight className="h-3 w-3" />
-                </Button>
-              </CardAction>
+            <div>
+              <CardTitle className="text-[15px] font-semibold flex items-center gap-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                Ứng viên theo trạng thái
+              </CardTitle>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Tổng cộng {totalWorkers} ứng viên trong hệ thống
+              </p>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="relative space-y-0">
-              <div className="absolute left-[52px] top-4 bottom-4 w-px bg-border" />
-
-              {todaySchedule.map((event, i) => (
-                <div
-                  key={i}
-                  className="group relative flex items-start gap-4 rounded-lg px-2 py-3 transition-colors hover:bg-muted/40"
-                >
-                  <span className="w-9 shrink-0 pt-0.5 text-right text-xs font-semibold tabular-nums text-foreground">
-                    {event.time}
-                  </span>
-                  <div className="relative z-10 mt-1.5 flex h-2.5 w-2.5 shrink-0 items-center justify-center">
-                    <span
-                      className={`h-2.5 w-2.5 rounded-full ${event.dotColor} ring-2 ring-card`}
-                    />
-                  </div>
-                  <div className="flex-1 -mt-0.5">
-                    <p className="text-[13px] font-medium leading-snug">
-                      {event.title}
-                    </p>
-                    <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      {event.subtitle}
-                    </p>
-                    <div className="mt-1.5 flex items-center gap-1.5">
-                      <Avatar size="sm">
-                        <AvatarFallback
-                          className={`bg-gradient-to-br ${event.assignee.avatarBg} text-[8px] font-semibold text-white`}
-                        >
-                          {event.assignee.initials}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-[11px] text-muted-foreground">
-                        {event.assignee.name}
-                      </span>
+            <div className="space-y-4">
+              {workerStatusGroups.map((group) => {
+                const pct = Math.round((group.count / totalWorkers) * 100)
+                return (
+                  <div key={group.label} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${group.bgColor}`}>
+                          <group.icon className={`h-4 w-4 ${group.color}`} />
+                        </div>
+                        <span className="text-[13px] font-medium">{group.label}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[20px] font-bold tabular-nums leading-none">
+                          {group.count}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">
+                          ({pct}%)
+                        </span>
+                      </div>
+                    </div>
+                    {/* Progress bar */}
+                    <div className="h-2 w-full rounded-full bg-muted">
+                      <div
+                        className={`h-2 rounded-full ${group.barColor} transition-all duration-500`}
+                        style={{ width: `${pct}%` }}
+                      />
                     </div>
                   </div>
+                )
+              })}
+            </div>
+
+            {/* Summary footer */}
+            <div className="mt-6 rounded-lg border border-border/50 bg-muted/30 p-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="text-center">
+                  <p className="text-[22px] font-bold text-primary tabular-nums">{totalWorkers}</p>
+                  <p className="text-[11px] text-muted-foreground">Tổng ứng viên</p>
                 </div>
-              ))}
+                <div className="text-center">
+                  <p className="text-[22px] font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                    {workerStatusGroups[0].count + workerStatusGroups[1].count}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">Có thể điều phối</p>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

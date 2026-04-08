@@ -21,11 +21,13 @@ interface AuthActions {
 
 type AuthStore = AuthState & AuthActions;
 
+const savedToken = localStorage.getItem(TOKEN_KEY);
+
 const initialState: AuthState = {
   user: null,
-  token: localStorage.getItem(TOKEN_KEY),
+  token: savedToken,
   isAuthenticated: false,
-  isLoading: false,
+  isLoading: !!savedToken,
 };
 
 export const useAuthStore = create<AuthStore>((set, get) => ({

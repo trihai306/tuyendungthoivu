@@ -44,5 +44,33 @@ export interface TaskFilter {
   priority?: TaskPriority
   type?: TaskType
   assigned_to?: string
+  assigned_by?: string
   search?: string
+  page?: number
+  per_page?: number
+  sort_by?: string
+  sort_direction?: "asc" | "desc"
+}
+
+export interface CreateTaskRequest {
+  title: string
+  description: string
+  type: TaskType
+  priority: TaskPriority
+  assigned_to_id: string
+  related_type?: string
+  related_id?: string
+  deadline: string
+  notes?: string
+}
+
+export interface UpdateTaskRequest {
+  title?: string
+  description?: string
+  type?: TaskType
+  priority?: TaskPriority
+  assigned_to_id?: string
+  deadline?: string
+  notes?: string
+  status?: TaskStatus
 }

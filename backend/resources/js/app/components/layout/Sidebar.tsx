@@ -1,25 +1,34 @@
-import { Link, useLocation } from "react-router-dom"
+import { Link, useLocation, useNavigate } from "react-router-dom"
 import { cn } from "@/lib/utils"
 import {
-  Home,
-  FileText,
-  Users,
-  Building,
-  BriefcaseBusiness,
-  CalendarDays,
+  LayoutDashboard,
   ClipboardList,
+  Building2,
+  Users,
+  Route,
+  CalendarCheck,
+  Banknote,
+  Receipt,
   BarChart3,
   Settings,
-  HelpCircle,
   LogOut,
   ChevronRight,
-  ShieldCheck,
-  History,
+  ChevronsUpDown,
   UserCog,
   Shield,
+  User,
   type LucideIcon,
 } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useAuthStore } from "@/stores/auth-store"
+import { useLogout } from "@/hooks/use-auth"
 
 interface NavItem {
   title: string
@@ -29,26 +38,24 @@ interface NavItem {
 }
 
 const mainNav: NavItem[] = [
-  { title: "Tổng quan", href: "/", icon: Home },
-  { title: "Tin tuyển dụng", href: "/jobs", icon: FileText, badge: 12 },
-  { title: "Ứng viên", href: "/candidates", icon: Users, badge: 48 },
-  { title: "Doanh nghiệp", href: "/employers", icon: Building },
-  { title: "Ứng tuyển", href: "/applications", icon: BriefcaseBusiness },
-  { title: "Lịch phỏng vấn", href: "/interviews", icon: CalendarDays },
-  { title: "Công việc", href: "/tasks", icon: ClipboardList, badge: 5 },
+  { title: "Tổng quan", href: "/", icon: LayoutDashboard },
+  { title: "Yêu cầu tuyển dụng", href: "/orders", icon: ClipboardList },
+  { title: "Khách hàng", href: "/clients", icon: Building2 },
+  { title: "Ứng viên", href: "/workers", icon: Users },
+  { title: "Điều phối", href: "/dispatch", icon: Route },
+  { title: "Chấm công", href: "/attendance", icon: CalendarCheck },
 ]
 
-const secondaryNav: NavItem[] = [
+const financeNav: NavItem[] = [
+  { title: "Bảng lương", href: "/payroll", icon: Banknote },
+  { title: "Hóa đơn", href: "/invoices", icon: Receipt },
   { title: "Báo cáo", href: "/reports", icon: BarChart3 },
-  { title: "Cài đặt", href: "/settings", icon: Settings },
-  { title: "Trợ giúp", href: "/help", icon: HelpCircle },
 ]
 
-const adminNav: NavItem[] = [
-  { title: "Nhân sự", href: "/staff", icon: UserCog },
-  { title: "Phòng ban", href: "/departments", icon: Building },
+const systemNav: NavItem[] = [
+  { title: "Nhân sự nội bộ", href: "/staff", icon: UserCog },
   { title: "Phân quyền", href: "/roles", icon: Shield },
-  { title: "Nhật ký", href: "/activity-logs", icon: History },
+  { title: "Cài đặt", href: "/settings", icon: Settings },
 ]
 
 interface SidebarNavProps {
@@ -58,6 +65,13 @@ interface SidebarNavProps {
 
 export function AppSidebar({ open = true, onClose }: SidebarNavProps) {
   const location = useLocation()
+  const navigate = useNavigate()
+  const user = useAuthStore((s) => s.user)
+  const logoutMutation = useLogout()
+
+  const userName = user?.name ?? "Người dùng"
+  const userInitials = userName.split(" ").map((w) => w[0]).join("").slice(-2).toUpperCase()
+  const userRole = user?.position ?? (user?.role === "admin" ? "Quản trị viên" : user?.role ?? "")
 
   const renderNavItem = (item: NavItem) => {
     const isActive = item.href === "/"
@@ -124,10 +138,10 @@ export function AppSidebar({ open = true, onClose }: SidebarNavProps) {
 
             <div>
               <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted-foreground">
-                Hệ thống
+                Tài chính
               </p>
               <div className="space-y-0.5">
-                {secondaryNav.map(renderNavItem)}
+                {financeNav.map(renderNavItem)}
               </div>
             </div>
 
@@ -135,30 +149,57 @@ export function AppSidebar({ open = true, onClose }: SidebarNavProps) {
 
             <div>
               <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted-foreground">
-                Quản trị
+                Hệ thống
               </p>
               <div className="space-y-0.5">
-                {adminNav.map(renderNavItem)}
+                {systemNav.map(renderNavItem)}
               </div>
             </div>
           </div>
         </nav>
 
         <div className="border-t border-border/70 p-3">
-          <div className="flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-accent">
-            <Avatar className="h-8 w-8 ring-2 ring-primary/10">
-              <AvatarFallback className="bg-gradient-to-br from-primary/80 to-primary text-[11px] font-semibold text-primary-foreground">
-                NV
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 truncate">
-              <p className="truncate text-sm font-medium leading-tight">Nguyễn Văn A</p>
-              <p className="truncate text-[11px] text-muted-foreground">Quản trị viên</p>
-            </div>
-            <button className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-              <LogOut className="h-3.5 w-3.5" />
-            </button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent focus:outline-none">
+                <Avatar className="h-8 w-8 ring-2 ring-primary/10">
+                  <AvatarFallback className="bg-gradient-to-br from-primary/80 to-primary text-[11px] font-semibold text-primary-foreground">
+                    {userInitials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 truncate">
+                  <p className="truncate text-sm font-medium leading-tight">{userName}</p>
+                  <p className="truncate text-[11px] text-muted-foreground">{userRole}</p>
+                </div>
+                <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="top" align="start" className="w-[220px]">
+              <div className="px-2 py-1.5">
+                <p className="text-sm font-semibold">{userName}</p>
+                <p className="text-xs text-muted-foreground">{user?.email}</p>
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="cursor-pointer" onClick={() => navigate("/settings")}>
+                <User className="h-4 w-4" />
+                Thông tin cá nhân
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer" onClick={() => navigate("/settings")}>
+                <Settings className="h-4 w-4" />
+                Cài đặt
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                className="cursor-pointer"
+                onClick={() => logoutMutation.mutate()}
+                disabled={logoutMutation.isPending}
+              >
+                <LogOut className="h-4 w-4" />
+                {logoutMutation.isPending ? "Đang đăng xuất..." : "Đăng xuất"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </aside>
     </>

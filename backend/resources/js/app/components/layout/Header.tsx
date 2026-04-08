@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { NotificationDropdown } from "@/components/layout/NotificationDropdown"
 import {
-  Bell,
   Menu,
   Search,
   Command,
@@ -26,7 +26,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
           </div>
           <div className="hidden sm:block">
             <span className="text-[15px] font-semibold tracking-tight">NVTV</span>
-            <span className="ml-1 text-[15px] font-normal text-muted-foreground">Tuyển Dụng</span>
+            <span className="ml-1 text-[15px] font-normal text-muted-foreground">Staffing</span>
           </div>
         </Link>
 
@@ -47,13 +47,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
 
           <ThemeToggle />
 
-          <Button variant="ghost" size="icon" className="relative h-8 w-8">
-            <Bell className="h-4 w-4" />
-            <span className="absolute right-1.5 top-1.5 flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-            </span>
-          </Button>
+          <NotificationDropdown />
         </div>
       </div>
     </header>

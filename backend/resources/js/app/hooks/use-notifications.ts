@@ -1,26 +1,22 @@
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { notificationsApi } from "@/services/notifications";
-import type { NotificationFilter } from "@/types";
+import type { Notification, NotificationFilter, PaginatedResponse } from "@/types";
 
 const NOTIFICATIONS_KEY = ["notifications"] as const;
 const UNREAD_COUNT_KEY = ["notifications", "unread-count"] as const;
 
 export function useNotifications(params?: NotificationFilter) {
-  return useQuery({
+  return useQuery<PaginatedResponse<Notification>>({
     queryKey: [...NOTIFICATIONS_KEY, params],
-    queryFn: () => notificationsApi.getNotifications(params),
+    queryFn: () => notificationsApi.list(params),
   });
 }
 
 export function useUnreadCount() {
-  return useQuery({
-    queryKey: UNREAD_COUNT_KEY,
+  return useQuery<number>({
+    queryKey: [...UNREAD_COUNT_KEY],
     queryFn: () => notificationsApi.getUnreadCount(),
-    refetchInterval: 30 * 1000, // Poll every 30 seconds
+    refetchInterval: 30_000, // Poll every 30 seconds
   });
 }
 

@@ -1,29 +1,45 @@
 import { apiClient } from "./api";
+import { createCrudService } from "./base.service";
 import type {
   CreateJobPostRequest,
   JobFilter,
   JobPost,
-  PaginatedResponse,
+  MessageResponse,
+  SingleResponse,
   UpdateJobPostRequest,
 } from "@/types";
 
+const crud = createCrudService<JobPost, CreateJobPostRequest, UpdateJobPostRequest, JobFilter>(
+  "/job-posts",
+);
+
 export const jobsApi = {
-  getJobs: (params?: JobFilter) =>
+  ...crud,
+
+  // ----- Legacy aliases (keep backward-compat with existing pages) -----
+  getJobs: crud.list,
+  getJob: crud.show,
+  createJob: crud.create,
+  updateJob: crud.update,
+  deleteJob: crud.remove,
+
+  // ----- Extended methods -----
+
+  /** Change job status (publish, close, expire, etc.) */
+  changeStatus: (id: string, status: string) =>
     apiClient
-      .get<PaginatedResponse<JobPost>>("/job-posts", { params })
-      .then((r) => r.data),
-
-  getJob: (id: string) =>
-    apiClient.get<{ data: JobPost }>(`/job-posts/${id}`).then((r) => r.data.data),
-
-  createJob: (data: CreateJobPostRequest) =>
-    apiClient.post<{ data: JobPost }>("/job-posts", data).then((r) => r.data.data),
-
-  updateJob: (id: string, data: UpdateJobPostRequest) =>
-    apiClient
-      .put<{ data: JobPost }>(`/job-posts/${id}`, data)
+      .patch<SingleResponse<JobPost>>(`/job-posts/${id}/status`, { status })
       .then((r) => r.data.data),
 
-  deleteJob: (id: string) =>
-    apiClient.delete<{ message: string }>(`/job-posts/${id}`).then((r) => r.data),
+  /** Duplicate an existing job post as a draft */
+  duplicate: (id: string) =>
+    apiClient
+      .post<SingleResponse<JobPost>>(`/job-posts/${id}/duplicate`)
+      .then((r) => r.data.data),
+
+  /** Bulk change status */
+  bulkChangeStatus: (ids: string[], status: string) =>
+    apiClient
+      .post<MessageResponse>("/job-posts/bulk-status", { ids, status })
+      .then((r) => r.data),
 };

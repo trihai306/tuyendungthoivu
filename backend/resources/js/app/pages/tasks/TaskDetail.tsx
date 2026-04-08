@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState } from "react"
 import { useParams, useNavigate, Link } from "react-router-dom"
 import {
   Card,
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   ArrowLeft,
   Clock,
@@ -26,9 +27,11 @@ import {
   CircleDot,
   ArrowRight,
   FileText,
+  Loader2,
 } from "lucide-react"
 import type { TaskType, TaskPriority, TaskStatus } from "@/types/task"
-import { mockTasks } from "@/data/mock-tasks"
+import { useTask, useChangeTaskStatus, useAddTaskComment } from "@/hooks/use-tasks"
+import { useAuthStore } from "@/stores/auth-store"
 
 // -- Config maps --
 
@@ -149,13 +152,34 @@ function formatDate(dateStr: string): string {
 export function TaskDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const user = useAuthStore((s) => s.user)
   const [newComment, setNewComment] = useState("")
 
-  const task = useMemo(() => {
-    return mockTasks.find((t) => t.id === id)
-  }, [id])
+  const { data: task, isLoading, isError } = useTask(id)
+  const changeStatus = useChangeTaskStatus()
+  const addComment = useAddTaskComment()
 
-  if (!task) {
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-4 w-[200px]" />
+        <Skeleton className="h-8 w-[300px]" />
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2">
+            <Skeleton className="h-48 w-full" />
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+          <div className="space-y-4">
+            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-32 w-full" />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (isError || !task) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <p className="text-lg font-medium text-muted-foreground">
@@ -177,10 +201,17 @@ export function TaskDetail() {
   const priority = priorityConfig[task.priority]
 
   const handleAddComment = () => {
-    if (newComment.trim()) {
-      // Mock - in real app, this would call the API
-      console.log("Add comment:", newComment)
-      setNewComment("")
+    if (newComment.trim() && id) {
+      addComment.mutate(
+        { taskId: id, content: newComment.trim() },
+        { onSuccess: () => setNewComment("") },
+      )
+    }
+  }
+
+  const handleStatusChange = (newStatus: TaskStatus) => {
+    if (id) {
+      changeStatus.mutate({ id, status: newStatus })
     }
   }
 
@@ -315,18 +346,18 @@ export function TaskDetail() {
                   Bình luận
                 </CardTitle>
                 <span className="rounded-md bg-muted px-1.5 py-px text-[10px] font-semibold tabular-nums text-muted-foreground">
-                  {task.comments.length}
+                  {task.comments?.length ?? 0}
                 </span>
               </div>
             </CardHeader>
             <CardContent>
-              {task.comments.length === 0 ? (
+              {(task.comments?.length ?? 0) === 0 ? (
                 <p className="py-6 text-center text-[13px] text-muted-foreground">
                   Chưa có bình luận nào
                 </p>
               ) : (
                 <div className="space-y-4">
-                  {task.comments.map((comment) => (
+                  {(task.comments ?? []).map((comment) => (
                     <div key={comment.id} className="flex gap-3">
                       <Avatar className="h-7 w-7 shrink-0">
                         <AvatarFallback className="bg-gradient-to-br from-primary/80 to-primary text-[9px] font-semibold text-primary-foreground">
@@ -357,7 +388,7 @@ export function TaskDetail() {
               <div className="flex gap-3">
                 <Avatar className="h-7 w-7 shrink-0">
                   <AvatarFallback className="bg-gradient-to-br from-primary/80 to-primary text-[9px] font-semibold text-primary-foreground">
-                    NV
+                    {user?.name ? getInitials(user.name) : "NV"}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
@@ -371,9 +402,13 @@ export function TaskDetail() {
                     <Button
                       size="sm"
                       onClick={handleAddComment}
-                      disabled={!newComment.trim()}
+                      disabled={!newComment.trim() || addComment.isPending}
                     >
-                      <Send className="mr-1.5 h-3 w-3" />
+                      {addComment.isPending ? (
+                        <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                      ) : (
+                        <Send className="mr-1.5 h-3 w-3" />
+                      )}
                       Gửi
                     </Button>
                   </div>
@@ -511,8 +546,17 @@ export function TaskDetail() {
             </CardHeader>
             <CardContent className="space-y-2">
               {task.status === "pending" && (
-                <Button className="w-full" size="sm">
-                  <Play className="mr-1.5 h-3.5 w-3.5" />
+                <Button
+                  className="w-full"
+                  size="sm"
+                  disabled={changeStatus.isPending}
+                  onClick={() => handleStatusChange("in_progress")}
+                >
+                  {changeStatus.isPending ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Play className="mr-1.5 h-3.5 w-3.5" />
+                  )}
                   Bắt đầu xử lý
                 </Button>
               )}
@@ -520,14 +564,30 @@ export function TaskDetail() {
                 <Button
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
                   size="sm"
+                  disabled={changeStatus.isPending}
+                  onClick={() => handleStatusChange("completed")}
                 >
-                  <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                  {changeStatus.isPending ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                  )}
                   Hoàn thành
                 </Button>
               )}
               {task.status !== "completed" && task.status !== "cancelled" && (
-                <Button variant="destructive" className="w-full" size="sm">
-                  <XCircle className="mr-1.5 h-3.5 w-3.5" />
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  size="sm"
+                  disabled={changeStatus.isPending}
+                  onClick={() => handleStatusChange("cancelled")}
+                >
+                  {changeStatus.isPending ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <XCircle className="mr-1.5 h-3.5 w-3.5" />
+                  )}
                   Hủy công việc
                 </Button>
               )}

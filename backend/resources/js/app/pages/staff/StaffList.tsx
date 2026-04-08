@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState } from "react"
 import { Link } from "react-router-dom"
 import {
   Card,
@@ -38,6 +38,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Search,
   UserCog,
@@ -52,9 +53,13 @@ import {
   Ban,
   Sparkles,
   ArrowUpRight,
+  AlertCircle,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
-import type { Staff, StaffRole } from "@/types/staff"
+import type { StaffRole } from "@/types/staff"
+import { useStaffList, useToggleStaffActive } from "@/hooks/use-staff"
+import { useDepartments } from "@/hooks/use-departments"
+import { toast } from "sonner"
 
 // --- Role config ---
 
@@ -101,150 +106,6 @@ interface StatItem {
   iconBg: string
 }
 
-// --- Mock data ---
-
-const mockStaff: Staff[] = [
-  {
-    id: "1",
-    name: "Nguyễn Văn Hùng",
-    email: "hung.nv@company.vn",
-    phone: "0901234567",
-    employee_code: "NV-001",
-    role: "super_admin",
-    department: { id: "d1", name: "Phòng Vận hành", description: "", member_count: 8, status: "active" },
-    team: { id: "t1", department_id: "d1", name: "Ban Giám đốc", description: "", members: [], member_count: 3, status: "active" },
-    position: "Giám đốc điều hành",
-    is_active: true,
-    hire_date: "2020-03-15",
-    stats: { tasks_completed: 45, tasks_pending: 2, interviews_done: 12, applications_reviewed: 89 },
-  },
-  {
-    id: "2",
-    name: "Trần Thị Mai",
-    email: "mai.tt@company.vn",
-    phone: "0912345678",
-    employee_code: "NV-002",
-    role: "admin",
-    department: { id: "d1", name: "Phòng Vận hành", description: "", member_count: 8, status: "active" },
-    team: { id: "t2", department_id: "d1", name: "Nhóm Quản trị", description: "", members: [], member_count: 4, status: "active" },
-    position: "Quản trị hệ thống",
-    is_active: true,
-    hire_date: "2021-06-01",
-    stats: { tasks_completed: 38, tasks_pending: 5, interviews_done: 0, applications_reviewed: 45 },
-  },
-  {
-    id: "3",
-    name: "Lê Văn Đức",
-    email: "duc.lv@company.vn",
-    phone: "0923456789",
-    employee_code: "NV-003",
-    role: "manager",
-    department: { id: "d2", name: "Phòng Tuyển dụng", description: "", member_count: 12, status: "active" },
-    team: { id: "t3", department_id: "d2", name: "Nhóm Tuyển dụng CNTT", description: "", members: [], member_count: 5, status: "active" },
-    position: "Trưởng phòng tuyển dụng",
-    is_active: true,
-    hire_date: "2020-09-10",
-    stats: { tasks_completed: 52, tasks_pending: 8, interviews_done: 35, applications_reviewed: 156 },
-  },
-  {
-    id: "4",
-    name: "Phạm Thị Hoa",
-    email: "hoa.pt@company.vn",
-    phone: "0934567890",
-    employee_code: "NV-004",
-    role: "recruiter",
-    department: { id: "d2", name: "Phòng Tuyển dụng", description: "", member_count: 12, status: "active" },
-    team: { id: "t3", department_id: "d2", name: "Nhóm Tuyển dụng CNTT", description: "", members: [], member_count: 5, status: "active" },
-    position: "Chuyên viên tuyển dụng",
-    is_active: true,
-    hire_date: "2022-01-15",
-    stats: { tasks_completed: 67, tasks_pending: 12, interviews_done: 48, applications_reviewed: 234 },
-  },
-  {
-    id: "5",
-    name: "Hoàng Minh Tuấn",
-    email: "tuan.hm@company.vn",
-    phone: "0945678901",
-    employee_code: "NV-005",
-    role: "recruiter",
-    department: { id: "d2", name: "Phòng Tuyển dụng", description: "", member_count: 12, status: "active" },
-    team: { id: "t4", department_id: "d2", name: "Nhóm Tuyển dụng Sản xuất", description: "", members: [], member_count: 4, status: "active" },
-    position: "Chuyên viên tuyển dụng",
-    is_active: true,
-    hire_date: "2022-05-20",
-    stats: { tasks_completed: 43, tasks_pending: 7, interviews_done: 29, applications_reviewed: 178 },
-  },
-  {
-    id: "6",
-    name: "Vũ Thị Lan",
-    email: "lan.vt@company.vn",
-    phone: "0956789012",
-    employee_code: "NV-006",
-    role: "coordinator",
-    department: { id: "d3", name: "Phòng Quản lý trọ", description: "", member_count: 6, status: "active" },
-    team: { id: "t5", department_id: "d3", name: "Nhóm Quản lý trọ Bắc", description: "", members: [], member_count: 3, status: "active" },
-    position: "Điều phối viên nhà trọ",
-    is_active: true,
-    hire_date: "2023-02-01",
-    stats: { tasks_completed: 31, tasks_pending: 4, interviews_done: 0, applications_reviewed: 0 },
-  },
-  {
-    id: "7",
-    name: "Đặng Quốc Bảo",
-    email: "bao.dq@company.vn",
-    phone: "0967890123",
-    employee_code: "NV-007",
-    role: "manager",
-    department: { id: "d3", name: "Phòng Quản lý trọ", description: "", member_count: 6, status: "active" },
-    team: { id: "t5", department_id: "d3", name: "Nhóm Quản lý trọ Bắc", description: "", members: [], member_count: 3, status: "active" },
-    position: "Trưởng phòng quản lý trọ",
-    is_active: true,
-    hire_date: "2021-08-15",
-    stats: { tasks_completed: 28, tasks_pending: 3, interviews_done: 5, applications_reviewed: 12 },
-  },
-  {
-    id: "8",
-    name: "Bùi Thị Ngọc",
-    email: "ngoc.bt@company.vn",
-    phone: "0978901234",
-    employee_code: "NV-008",
-    role: "recruiter",
-    department: { id: "d2", name: "Phòng Tuyển dụng", description: "", member_count: 12, status: "active" },
-    team: { id: "t4", department_id: "d2", name: "Nhóm Tuyển dụng Sản xuất", description: "", members: [], member_count: 4, status: "active" },
-    position: "Chuyên viên tuyển dụng",
-    is_active: false,
-    hire_date: "2022-11-01",
-    stats: { tasks_completed: 22, tasks_pending: 0, interviews_done: 15, applications_reviewed: 98 },
-  },
-  {
-    id: "9",
-    name: "Ngô Thanh Phong",
-    email: "phong.nt@company.vn",
-    phone: "0989012345",
-    employee_code: "NV-009",
-    role: "coordinator",
-    department: { id: "d1", name: "Phòng Vận hành", description: "", member_count: 8, status: "active" },
-    team: { id: "t2", department_id: "d1", name: "Nhóm Quản trị", description: "", members: [], member_count: 4, status: "active" },
-    position: "Điều phối viên vận hành",
-    is_active: true,
-    hire_date: "2023-04-10",
-    stats: { tasks_completed: 19, tasks_pending: 6, interviews_done: 0, applications_reviewed: 0 },
-  },
-  {
-    id: "10",
-    name: "Lý Thị Kim Anh",
-    email: "anh.ltk@company.vn",
-    phone: "0990123456",
-    employee_code: "NV-010",
-    role: "viewer",
-    department: { id: "d1", name: "Phòng Vận hành", description: "", member_count: 8, status: "active" },
-    position: "Thực tập sinh",
-    is_active: true,
-    hire_date: "2024-01-08",
-    stats: { tasks_completed: 8, tasks_pending: 3, interviews_done: 0, applications_reviewed: 15 },
-  },
-]
-
 function getInitials(name: string): string {
   const parts = name.split(" ")
   if (parts.length < 2) return name.charAt(0).toUpperCase()
@@ -268,7 +129,6 @@ function getAvatarColor(index: number): string {
   return avatarColors[index % avatarColors.length]
 }
 
-const departmentOptions = ["Tất cả", "Phòng Tuyển dụng", "Phòng Quản lý trọ", "Phòng Vận hành"]
 const roleOptions: { label: string; value: string }[] = [
   { label: "Tất cả", value: "all" },
   { label: "Super Admin", value: "super_admin" },
@@ -278,46 +138,45 @@ const roleOptions: { label: string; value: string }[] = [
   { label: "Điều phối viên", value: "coordinator" },
   { label: "Xem", value: "viewer" },
 ]
-const statusOptions = ["Tất cả", "Hoạt động", "Ngưng"]
+const statusOptions = [
+  { label: "Tất cả", value: "all" },
+  { label: "Hoạt động", value: "active" },
+  { label: "Ngưng", value: "inactive" },
+]
 
 export function StaffList() {
   const [search, setSearch] = useState("")
-  const [departmentFilter, setDepartmentFilter] = useState("Tất cả")
-  const [roleFilter, setRoleFilter] = useState("all")
-  const [statusFilter, setStatusFilter] = useState("Tất cả")
+  const [departmentFilter, setDepartmentFilter] = useState("")
+  const [roleFilter, setRoleFilter] = useState("")
+  const [statusFilter, setStatusFilter] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const perPage = 8
 
-  const filtered = useMemo(() => {
-    return mockStaff.filter((s) => {
-      const matchSearch =
-        !search ||
-        s.name.toLowerCase().includes(search.toLowerCase()) ||
-        s.employee_code.toLowerCase().includes(search.toLowerCase()) ||
-        s.email.toLowerCase().includes(search.toLowerCase())
+  // Fetch departments for filter dropdown
+  const { data: deptData } = useDepartments({ per_page: 100 })
 
-      const matchDept =
-        departmentFilter === "Tất cả" || s.department?.name === departmentFilter
+  // Build API filters
+  const apiFilters = {
+    search: search || undefined,
+    role: roleFilter ? (roleFilter as StaffRole) : undefined,
+    department_id: departmentFilter || undefined,
+    is_active: statusFilter === "active" ? true : statusFilter === "inactive" ? false : undefined,
+    page: currentPage,
+    per_page: perPage,
+  }
 
-      const matchRole = roleFilter === "all" || s.role === roleFilter
+  const { data, isLoading, isError } = useStaffList(apiFilters)
+  const toggleActive = useToggleStaffActive()
 
-      const matchStatus =
-        statusFilter === "Tất cả" ||
-        (statusFilter === "Hoạt động" && s.is_active) ||
-        (statusFilter === "Ngưng" && !s.is_active)
+  const staffList = data?.data ?? []
+  const meta = data?.meta
+  const totalPages = meta?.last_page ?? 1
+  const totalStaff = meta?.total ?? 0
 
-      return matchSearch && matchDept && matchRole && matchStatus
-    })
-  }, [search, departmentFilter, roleFilter, statusFilter])
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
-  const paginated = filtered.slice((currentPage - 1) * perPage, currentPage * perPage)
-
-  // Compute stats
-  const totalStaff = mockStaff.length
-  const activeStaff = mockStaff.filter((s) => s.is_active).length
-  const recruiterCount = mockStaff.filter((s) => s.role === "recruiter" && s.is_active).length
-  const managerCount = mockStaff.filter((s) => (s.role === "manager" || s.role === "super_admin" || s.role === "admin") && s.is_active).length
+  // Compute stats from current page data (approximate)
+  const activeStaff = staffList.filter((s) => s.is_active).length
+  const recruiterCount = staffList.filter((s) => s.role === "recruiter" && s.is_active).length
+  const managerCount = staffList.filter((s) => (s.role === "manager" || s.role === "super_admin" || s.role === "admin") && s.is_active).length
 
   const statsItems: StatItem[] = [
     {
@@ -330,8 +189,8 @@ export function StaffList() {
     },
     {
       title: "Đang hoạt động",
-      value: String(activeStaff),
-      change: `${Math.round((activeStaff / totalStaff) * 100)}%`,
+      value: totalStaff > 0 ? String(activeStaff) : "0",
+      change: totalStaff > 0 ? `${Math.round((activeStaff / Math.max(staffList.length, 1)) * 100)}%` : "0%",
       icon: UserCheck,
       description: "tỷ lệ",
       iconBg: "from-emerald-500 to-emerald-600",
@@ -373,7 +232,7 @@ export function StaffList() {
             </p>
           </div>
           <div className="hidden sm:flex gap-2">
-            <Button size="sm" className="bg-white text-primary hover:bg-white/90 shadow-sm">
+            <Button size="sm" className="bg-white text-primary hover:bg-white/90 shadow-sm" onClick={() => toast.info("Tính năng đang phát triển")}>
               <Plus className="mr-1.5 h-3.5 w-3.5" />
               Thêm nhân viên
             </Button>
@@ -390,7 +249,11 @@ export function StaffList() {
                 <div className="space-y-3">
                   <p className="text-[13px] font-medium text-muted-foreground">{stat.title}</p>
                   <div>
-                    <span className="text-[28px] font-semibold tracking-tight leading-none">{stat.value}</span>
+                    {isLoading ? (
+                      <Skeleton className="h-8 w-12" />
+                    ) : (
+                      <span className="text-[28px] font-semibold tracking-tight leading-none">{stat.value}</span>
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="flex items-center gap-0.5 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
@@ -423,33 +286,34 @@ export function StaffList() {
               />
             </div>
             <div className="flex flex-wrap gap-2">
-              <Select value={departmentFilter} onValueChange={(v) => { setDepartmentFilter(v); setCurrentPage(1) }}>
+              <Select value={departmentFilter} onValueChange={(v) => { setDepartmentFilter(v === "__all__" ? "" : v); setCurrentPage(1) }}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Phòng ban" />
                 </SelectTrigger>
                 <SelectContent>
-                  {departmentOptions.map((d) => (
-                    <SelectItem key={d} value={d}>{d}</SelectItem>
+                  <SelectItem value="__all__">Tất cả</SelectItem>
+                  {deptData?.data?.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={roleFilter} onValueChange={(v) => { setRoleFilter(v); setCurrentPage(1) }}>
+              <Select value={roleFilter} onValueChange={(v) => { setRoleFilter(v === "__all__" ? "" : v); setCurrentPage(1) }}>
                 <SelectTrigger className="w-[170px]">
                   <SelectValue placeholder="Vai trò" />
                 </SelectTrigger>
                 <SelectContent>
                   {roleOptions.map((r) => (
-                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                    <SelectItem key={r.value} value={r.value === "all" ? "__all__" : r.value}>{r.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setCurrentPage(1) }}>
+              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v === "__all__" ? "" : v); setCurrentPage(1) }}>
                 <SelectTrigger className="w-[140px]">
                   <SelectValue placeholder="Trạng thái" />
                 </SelectTrigger>
                 <SelectContent>
                   {statusOptions.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                    <SelectItem key={s.value} value={s.value === "all" ? "__all__" : s.value}>{s.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -461,12 +325,56 @@ export function StaffList() {
       {/* Results count */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Hiển thị <span className="font-medium text-foreground">{paginated.length}</span> / <span className="font-medium text-foreground">{filtered.length}</span> nhân viên
+          Hiển thị <span className="font-medium text-foreground">{staffList.length}</span> / <span className="font-medium text-foreground">{totalStaff}</span> nhân viên
         </p>
       </div>
 
+      {/* Error state */}
+      {isError && (
+        <Card className="border-red-200 bg-red-50 dark:border-red-500/20 dark:bg-red-500/5 shadow-sm">
+          <CardContent className="flex items-center gap-3 p-4">
+            <AlertCircle className="h-5 w-5 text-red-500" />
+            <p className="text-sm text-red-700 dark:text-red-400">Không thể tải dữ liệu nhân viên. Vui lòng thử lại.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Loading state */}
+      {isLoading && (
+        <Card className="border-border/50 shadow-sm">
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="h-10 pl-6">Nhân viên</TableHead>
+                  <TableHead className="h-10">Vai trò</TableHead>
+                  <TableHead className="h-10">Phòng ban</TableHead>
+                  <TableHead className="h-10">Chức vụ</TableHead>
+                  <TableHead className="h-10">KPI</TableHead>
+                  <TableHead className="h-10">Trạng thái</TableHead>
+                  <TableHead className="h-10 pr-6 text-right">Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="py-3 pl-6"><Skeleton className="h-9 w-40" /></TableCell>
+                    <TableCell className="py-3"><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell className="py-3"><Skeleton className="h-9 w-32" /></TableCell>
+                    <TableCell className="py-3"><Skeleton className="h-5 w-28" /></TableCell>
+                    <TableCell className="py-3"><Skeleton className="h-4 w-20" /></TableCell>
+                    <TableCell className="py-3"><Skeleton className="h-5 w-16" /></TableCell>
+                    <TableCell className="py-3 pr-6 text-right"><Skeleton className="h-7 w-7 ml-auto" /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Table */}
-      {paginated.length === 0 ? (
+      {!isLoading && !isError && staffList.length === 0 ? (
         <Card className="border-border/50 shadow-sm">
           <CardContent className="flex flex-col items-center justify-center py-16">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
@@ -478,7 +386,7 @@ export function StaffList() {
             </p>
           </CardContent>
         </Card>
-      ) : (
+      ) : !isLoading && !isError && (
         <Card className="border-border/50 shadow-sm">
           <CardContent className="p-0">
             <Table>
@@ -494,8 +402,8 @@ export function StaffList() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginated.map((staff, index) => {
-                  const role = roleConfig[staff.role]
+                {staffList.map((staff, index) => {
+                  const role = roleConfig[staff.role] ?? roleConfig.viewer
                   const totalTasks = (staff.stats?.tasks_completed ?? 0) + (staff.stats?.tasks_pending ?? 0)
                   const completedTasks = staff.stats?.tasks_completed ?? 0
                   const kpiPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
@@ -511,7 +419,7 @@ export function StaffList() {
                           </Avatar>
                           <div>
                             <Link
-                              to={`/nhan-su/${staff.id}`}
+                              to={`/staff/${staff.id}`}
                               className="text-[13px] font-medium hover:text-primary transition-colors"
                             >
                               {staff.name}
@@ -571,20 +479,23 @@ export function StaffList() {
                             <MoreHorizontal className="h-4 w-4" />
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" sideOffset={4}>
-                            <DropdownMenuItem render={<Link to={`/nhan-su/${staff.id}`} />}>
+                            <DropdownMenuItem render={<Link to={`/staff/${staff.id}`} />}>
                               <Eye className="h-4 w-4" />
                               Xem chi tiết
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => toast.info("Tính năng đang phát triển")}>
                               <Pencil className="h-4 w-4" />
                               Sửa thông tin
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => toast.info("Tính năng đang phát triển")}>
                               <ClipboardList className="h-4 w-4" />
                               Giao việc
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem variant="destructive">
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={() => toggleActive.mutate(staff.id)}
+                            >
                               <Ban className="h-4 w-4" />
                               {staff.is_active ? "Vô hiệu hóa" : "Kích hoạt lại"}
                             </DropdownMenuItem>

@@ -13,9 +13,10 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Building2, Home, Loader2, Users } from "lucide-react"
+import { Briefcase, Building2, Loader2, Users } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useRegister } from "@/hooks/use-auth"
 
 const VN_PHONE_REGEX = /^(0|\+84)(3[2-9]|5[2689]|7[06-9]|8[1-9]|9[0-9])\d{7}$/
 
@@ -40,7 +41,7 @@ const registerSchema = z
     confirmPassword: z
       .string()
       .min(1, "Vui lòng xác nhận mật khẩu"),
-    role: z.enum(["nhan_vien", "nha_tuyen_dung", "chu_tro"], {
+    role: z.enum(["worker", "employer", "staff"], {
       error: "Vui lòng chọn vai trò",
     }),
   })
@@ -60,28 +61,29 @@ interface RoleOption {
 
 const roleOptions: RoleOption[] = [
   {
-    value: "nhan_vien",
-    label: "Nhân viên thời vụ",
-    description: "Tìm kiếm việc làm thời vụ",
+    value: "worker",
+    label: "Lao động thời vụ",
+    description: "Đăng ký nhận việc thời vụ",
     icon: Users,
   },
   {
-    value: "nha_tuyen_dung",
-    label: "Nhà tuyển dụng",
-    description: "Đăng tin tuyển dụng",
+    value: "employer",
+    label: "Khách hàng",
+    description: "Doanh nghiệp cần nhân sự",
     icon: Building2,
   },
   {
-    value: "chu_tro",
-    label: "Chủ trọ",
-    description: "Quản lý nhà trọ cho thuê",
-    icon: Home,
+    value: "staff",
+    label: "Nhân viên nội bộ",
+    description: "Điều phối & vận hành",
+    icon: Briefcase,
   },
 ]
 
 export function Register() {
-  const [isLoading, setIsLoading] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
+  const registerMutation = useRegister()
+  const isLoading = registerMutation.isPending
 
   const {
     register,
@@ -100,17 +102,18 @@ export function Register() {
   })
 
   const onSubmit = async (data: RegisterFormData) => {
-    setIsLoading(true)
     setServerError(null)
     try {
-      // TODO: Integrate with API
-      console.log("Register data:", data)
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-    } catch {
-      setServerError("Đăng ký thất bại. Vui lòng thử lại sau.")
-    } finally {
-      setIsLoading(false)
+      await registerMutation.mutateAsync({
+        name: data.name,
+        email: data.email,
+        password: data.password,
+        password_confirmation: data.confirmPassword,
+        role: data.role,
+        phone: data.phone || undefined,
+      })
+    } catch (error: any) {
+      setServerError(error.message ?? "Đăng ký thất bại. Vui lòng thử lại sau.")
     }
   }
 
@@ -121,10 +124,10 @@ export function Register() {
         <div className="flex flex-col items-center space-y-2">
           <div className="flex items-center gap-2">
             <Building2 className="h-8 w-8 text-primary" />
-            <span className="text-2xl font-bold">NVTV Tuyển Dụng</span>
+            <span className="text-2xl font-bold">NVTV Staffing</span>
           </div>
           <p className="text-sm text-muted-foreground">
-            Hệ thống tuyển dụng nhân viên tiếp viên
+            Hệ thống quản lý cung ứng nhân sự thời vụ
           </p>
         </div>
 
@@ -305,7 +308,7 @@ export function Register() {
         </Card>
 
         <p className="text-center text-xs text-muted-foreground">
-          &copy; 2026 NVTV Tuyển Dụng. All rights reserved.
+          &copy; 2026 NVTV Staffing. All rights reserved.
         </p>
       </div>
     </div>

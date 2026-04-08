@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ArrowLeft, Building2, CheckCircle, Loader2 } from "lucide-react"
+import { useForgotPassword } from "@/hooks/use-auth"
 
 const forgotPasswordSchema = z.object({
   email: z
@@ -25,9 +26,10 @@ const forgotPasswordSchema = z.object({
 type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>
 
 export function ForgotPassword() {
-  const [isLoading, setIsLoading] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
+  const forgotPasswordMutation = useForgotPassword()
+  const isLoading = forgotPasswordMutation.isPending
 
   const {
     register,
@@ -41,18 +43,12 @@ export function ForgotPassword() {
   })
 
   const onSubmit = async (data: ForgotPasswordFormData) => {
-    setIsLoading(true)
     setServerError(null)
     try {
-      // TODO: Integrate with API
-      console.log("Forgot password:", data)
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      await forgotPasswordMutation.mutateAsync(data)
       setIsSuccess(true)
-    } catch {
-      setServerError("Không thể gửi yêu cầu. Vui lòng thử lại sau.")
-    } finally {
-      setIsLoading(false)
+    } catch (error: any) {
+      setServerError(error.message ?? "Không thể gửi yêu cầu. Vui lòng thử lại sau.")
     }
   }
 
@@ -63,10 +59,10 @@ export function ForgotPassword() {
         <div className="flex flex-col items-center space-y-2">
           <div className="flex items-center gap-2">
             <Building2 className="h-8 w-8 text-primary" />
-            <span className="text-2xl font-bold">NVTV Tuyển Dụng</span>
+            <span className="text-2xl font-bold">NVTV Staffing</span>
           </div>
           <p className="text-sm text-muted-foreground">
-            Hệ thống tuyển dụng nhân viên tiếp viên
+            Hệ thống quản lý cung ứng nhân sự thời vụ
           </p>
         </div>
 
@@ -145,7 +141,7 @@ export function ForgotPassword() {
         </Card>
 
         <p className="text-center text-xs text-muted-foreground">
-          &copy; 2026 NVTV Tuyển Dụng. All rights reserved.
+          &copy; 2026 NVTV Staffing. All rights reserved.
         </p>
       </div>
     </div>

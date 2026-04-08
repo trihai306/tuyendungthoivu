@@ -1,9 +1,10 @@
-import { useState, useMemo } from "react"
+import { useState } from "react"
 import { Link } from "react-router-dom"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Select,
   SelectContent,
@@ -24,116 +25,12 @@ import {
   MapPin,
   Building2,
   Users,
-  FileText,
   BadgeCheck,
 } from "lucide-react"
+import { useEmployers } from "@/hooks/use-employers"
+import type { EmployerProfile } from "@/types"
 
-// --- Types ---
-
-interface Employer {
-  id: string
-  name: string
-  initials: string
-  industry: string
-  city: string
-  size: string
-  openJobs: number
-  verified: boolean
-  logoBg: string
-}
-
-// --- Mock data ---
-
-const mockEmployers: Employer[] = [
-  {
-    id: "1",
-    name: "FPT Software",
-    initials: "FP",
-    industry: "Công nghệ thông tin",
-    city: "Hồ Chí Minh",
-    size: "1000+ nhân viên",
-    openJobs: 15,
-    verified: true,
-    logoBg: "from-orange-400 to-orange-600",
-  },
-  {
-    id: "2",
-    name: "Vingroup",
-    initials: "VG",
-    industry: "Bất động sản",
-    city: "Hà Nội",
-    size: "5000+ nhân viên",
-    openJobs: 23,
-    verified: true,
-    logoBg: "from-red-400 to-red-600",
-  },
-  {
-    id: "3",
-    name: "Tiki Corporation",
-    initials: "TK",
-    industry: "Thương mại điện tử",
-    city: "Hồ Chí Minh",
-    size: "500-1000 nhân viên",
-    openJobs: 8,
-    verified: true,
-    logoBg: "from-blue-400 to-blue-600",
-  },
-  {
-    id: "4",
-    name: "Masan Group",
-    initials: "MS",
-    industry: "FMCG",
-    city: "Hồ Chí Minh",
-    size: "5000+ nhân viên",
-    openJobs: 12,
-    verified: true,
-    logoBg: "from-emerald-400 to-emerald-600",
-  },
-  {
-    id: "5",
-    name: "Đà Nẵng Logistics",
-    initials: "DL",
-    industry: "Vận tải & Logistics",
-    city: "Đà Nẵng",
-    size: "50-200 nhân viên",
-    openJobs: 3,
-    verified: false,
-    logoBg: "from-cyan-400 to-cyan-600",
-  },
-  {
-    id: "6",
-    name: "VNG Corporation",
-    initials: "VN",
-    industry: "Công nghệ thông tin",
-    city: "Hồ Chí Minh",
-    size: "1000+ nhân viên",
-    openJobs: 19,
-    verified: true,
-    logoBg: "from-violet-400 to-violet-600",
-  },
-  {
-    id: "7",
-    name: "Hòa Phát Group",
-    initials: "HP",
-    industry: "Sản xuất",
-    city: "Hà Nội",
-    size: "5000+ nhân viên",
-    openJobs: 7,
-    verified: true,
-    logoBg: "from-amber-400 to-amber-600",
-  },
-  {
-    id: "8",
-    name: "Nhà hàng Cơm Ngon",
-    initials: "CN",
-    industry: "Nhà hàng & Khách sạn",
-    city: "Cần Thơ",
-    size: "10-50 nhân viên",
-    openJobs: 2,
-    verified: false,
-    logoBg: "from-pink-400 to-pink-600",
-  },
-]
+// --- Helpers ---
 
 const industries = [
   "Tất cả",
@@ -158,6 +55,35 @@ const industryColors: Record<string, string> = {
   "Nhà hàng & Khách sạn": "bg-pink-50 text-pink-700 border-pink-200/80 dark:bg-pink-500/10 dark:text-pink-400 dark:border-pink-500/20",
 }
 
+const avatarColors = [
+  "from-orange-400 to-orange-600",
+  "from-red-400 to-red-600",
+  "from-blue-400 to-blue-600",
+  "from-emerald-400 to-emerald-600",
+  "from-cyan-400 to-cyan-600",
+  "from-violet-400 to-violet-600",
+  "from-amber-400 to-amber-600",
+  "from-pink-400 to-pink-600",
+]
+
+function getAvatarColor(id: string): string {
+  let hash = 0
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  return avatarColors[Math.abs(hash) % avatarColors.length]
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase()
+}
+
 export function EmployerList() {
   const [search, setSearch] = useState("")
   const [industryFilter, setIndustryFilter] = useState("Tất cả")
@@ -165,20 +91,21 @@ export function EmployerList() {
   const [currentPage, setCurrentPage] = useState(1)
   const perPage = 6
 
-  const filtered = useMemo(() => {
-    return mockEmployers.filter((e) => {
-      const matchSearch =
-        !search || e.name.toLowerCase().includes(search.toLowerCase())
+  // Build API query params
+  const filters: Record<string, unknown> = {
+    page: currentPage,
+    per_page: perPage,
+  }
+  if (search) filters.search = search
+  if (industryFilter && industryFilter !== "Tất cả") filters.industry = industryFilter
+  if (cityFilter && cityFilter !== "Tất cả") filters.city = cityFilter
 
-      const matchIndustry = industryFilter === "Tất cả" || e.industry === industryFilter
-      const matchCity = cityFilter === "Tất cả" || e.city === cityFilter
+  const { data, isLoading, isError } = useEmployers(filters)
 
-      return matchSearch && matchIndustry && matchCity
-    })
-  }, [search, industryFilter, cityFilter])
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
-  const paginated = filtered.slice((currentPage - 1) * perPage, currentPage * perPage)
+  const employers = data?.data ?? []
+  const meta = data?.meta
+  const totalPages = meta?.last_page ?? 1
+  const total = meta?.total ?? 0
 
   return (
     <div className="space-y-6">
@@ -235,12 +162,48 @@ export function EmployerList() {
       {/* Results count */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Hiển thị <span className="font-medium text-foreground">{paginated.length}</span> / <span className="font-medium text-foreground">{filtered.length}</span> doanh nghiệp
+          Hiển thị <span className="font-medium text-foreground">{employers.length}</span> / <span className="font-medium text-foreground">{total}</span> doanh nghiệp
         </p>
       </div>
 
-      {/* Grid */}
-      {paginated.length === 0 ? (
+      {/* Loading state */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: perPage }).map((_, i) => (
+            <Card key={i} className="border-border/50 shadow-sm">
+              <CardContent className="p-5">
+                <div className="flex items-start gap-3.5">
+                  <Skeleton className="h-12 w-12 rounded-xl" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-5 w-28 rounded-md" />
+                  </div>
+                </div>
+                <div className="mt-4 space-y-2">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-3 w-28" />
+                  <Skeleton className="h-3 w-36" />
+                </div>
+                <div className="mt-4 pt-3.5 border-t border-border/50">
+                  <Skeleton className="h-8 w-full rounded-md" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : isError ? (
+        <Card className="border-border/50 shadow-sm">
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+              <Building2 className="h-6 w-6 text-destructive" />
+            </div>
+            <h3 className="mt-4 text-sm font-medium">Không thể tải dữ liệu</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Đã có lỗi xảy ra khi tải danh sách doanh nghiệp. Vui lòng thử lại.
+            </p>
+          </CardContent>
+        </Card>
+      ) : employers.length === 0 ? (
         <Card className="border-border/50 shadow-sm">
           <CardContent className="flex flex-col items-center justify-center py-16">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
@@ -253,37 +216,45 @@ export function EmployerList() {
           </CardContent>
         </Card>
       ) : (
+        /* Grid */
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {paginated.map((employer) => {
-            const industryColor = industryColors[employer.industry] ?? "bg-gray-50 text-gray-700 border-gray-200/80"
+          {employers.map((employer: EmployerProfile) => {
+            const companyName = employer.company_name ?? "N/A"
+            const logoBg = getAvatarColor(employer.user_id)
+            const initials = getInitials(companyName)
+            const industryColor = industryColors[employer.industry ?? ""] ?? "bg-gray-50 text-gray-700 border-gray-200/80"
+            const isVerified = !!employer.verified_at
+
             return (
               <Card
-                key={employer.id}
+                key={employer.user_id}
                 className="group border-border/50 shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
               >
                 <CardContent className="p-5">
                   <div className="flex items-start gap-3.5">
                     {/* Logo */}
                     <div
-                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${employer.logoBg} shadow-sm`}
+                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${logoBg} shadow-sm`}
                     >
-                      <span className="text-sm font-bold text-white">{employer.initials}</span>
+                      <span className="text-sm font-bold text-white">{initials}</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
                         <h3 className="text-[14px] font-semibold leading-snug truncate">
-                          {employer.name}
+                          {companyName}
                         </h3>
-                        {employer.verified && (
+                        {isVerified && (
                           <BadgeCheck className="h-4 w-4 shrink-0 text-blue-500" />
                         )}
                       </div>
-                      <Badge
-                        variant="outline"
-                        className={`mt-1.5 rounded-md text-[10px] font-medium ${industryColor}`}
-                      >
-                        {employer.industry}
-                      </Badge>
+                      {employer.industry && (
+                        <Badge
+                          variant="outline"
+                          className={`mt-1.5 rounded-md text-[10px] font-medium ${industryColor}`}
+                        >
+                          {employer.industry}
+                        </Badge>
+                      )}
                     </div>
                   </div>
 
@@ -291,16 +262,14 @@ export function EmployerList() {
                   <div className="mt-4 space-y-2">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <MapPin className="h-3.5 w-3.5 shrink-0" />
-                      <span>{employer.city}</span>
+                      <span>{employer.city ?? "Chưa cập nhật"}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Users className="h-3.5 w-3.5 shrink-0" />
-                      <span>{employer.size}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-primary font-medium">
-                      <FileText className="h-3.5 w-3.5 shrink-0" />
-                      <span>{employer.openJobs} tin tuyển dụng đang mở</span>
-                    </div>
+                    {employer.company_size && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Users className="h-3.5 w-3.5 shrink-0" />
+                        <span>{employer.company_size}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Action */}
@@ -309,7 +278,7 @@ export function EmployerList() {
                       variant="ghost"
                       size="sm"
                       className="w-full gap-1.5 text-xs"
-                      render={<Link to={`/doanh-nghiep/${employer.id}`} />}
+                      render={<Link to={`/doanh-nghiep/${employer.user_id}`} />}
                     >
                       Xem chi tiết
                     </Button>

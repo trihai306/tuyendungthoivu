@@ -22,8 +22,29 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react"
+import { useAuthStore } from "@/stores/auth-store"
+import type { UserRole } from "@/types"
+import { toast } from "sonner"
+
+const roleLabels: Record<UserRole, string> = {
+  admin: "Quản trị viên",
+  employer: "Nhà tuyển dụng",
+  worker: "Nhân viên",
+}
 
 export function Settings() {
+  const user = useAuthStore((s) => s.user)
+  const userName = user?.name ?? "Người dùng"
+  const userEmail = user?.email ?? ""
+  const userPhone = user?.phone ?? ""
+  const userRole = user?.role ? roleLabels[user.role] : "Người dùng"
+  const userInitials = userName
+    .split(" ")
+    .map((w) => w[0])
+    .slice(-2)
+    .join("")
+    .toUpperCase()
+
   const [showOldPassword, setShowOldPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -31,6 +52,7 @@ export function Settings() {
   const [emailNotif, setEmailNotif] = useState(true)
   const [pushNotif, setPushNotif] = useState(true)
   const [smsNotif, setSmsNotif] = useState(false)
+  const [mobileNotif, setMobileNotif] = useState(false)
 
   return (
     <div className="space-y-6">
@@ -74,7 +96,7 @@ export function Settings() {
                   <div className="relative group">
                     <Avatar size="lg" className="h-20 w-20 ring-4 ring-primary/10">
                       <AvatarFallback className="bg-gradient-to-br from-primary/80 to-primary text-lg font-semibold text-primary-foreground">
-                        NV
+                        {userInitials}
                       </AvatarFallback>
                     </Avatar>
                     <button className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
@@ -82,13 +104,13 @@ export function Settings() {
                     </button>
                   </div>
                   <div>
-                    <p className="text-[13px] font-medium text-foreground">Nguyễn Văn A</p>
-                    <p className="text-[11px] text-muted-foreground">Quản trị viên</p>
+                    <p className="text-[13px] font-medium text-foreground">{userName}</p>
+                    <p className="text-[11px] text-muted-foreground">{userRole}</p>
                     <div className="mt-2 flex gap-2">
-                      <Button variant="outline" size="sm" className="text-xs">
+                      <Button variant="outline" size="sm" className="text-xs" onClick={() => toast.info("Tính năng đang phát triển")}>
                         Tải ảnh lên
                       </Button>
-                      <Button variant="ghost" size="sm" className="text-xs text-muted-foreground">
+                      <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => toast.info("Tính năng đang phát triển")}>
                         Xóa
                       </Button>
                     </div>
@@ -108,7 +130,7 @@ export function Settings() {
                     <Label htmlFor="fullName" className="text-[13px]">Họ và tên</Label>
                     <Input
                       id="fullName"
-                      defaultValue="Nguyễn Văn A"
+                      defaultValue={userName}
                       className="text-[13px]"
                     />
                   </div>
@@ -117,7 +139,7 @@ export function Settings() {
                     <Input
                       id="email"
                       type="email"
-                      defaultValue="nguyenvana@example.com"
+                      defaultValue={userEmail}
                       className="text-[13px]"
                     />
                   </div>
@@ -126,13 +148,13 @@ export function Settings() {
                     <Input
                       id="phone"
                       type="tel"
-                      defaultValue="0912 345 678"
+                      defaultValue={userPhone}
                       className="text-[13px]"
                     />
                   </div>
                 </div>
                 <div className="mt-5 flex justify-end">
-                  <Button size="sm">
+                  <Button size="sm" onClick={() => toast.success("Đã lưu thông tin cá nhân")}>
                     Lưu thay đổi
                   </Button>
                 </div>
@@ -213,7 +235,7 @@ export function Settings() {
                       </p>
                     </div>
                   </div>
-                  <Switch />
+                  <Switch checked={mobileNotif} onCheckedChange={setMobileNotif} />
                 </div>
               </div>
             </CardContent>
@@ -301,7 +323,7 @@ export function Settings() {
                   </div>
                 </div>
                 <div className="pt-2">
-                  <Button size="sm">
+                  <Button size="sm" onClick={() => toast.success("Đã đổi mật khẩu thành công")}>
                     Đổi mật khẩu
                   </Button>
                 </div>

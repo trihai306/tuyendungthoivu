@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Select,
   SelectContent,
@@ -22,9 +23,10 @@ import {
   LayoutGrid,
   List,
   Sparkles,
+  Loader2,
 } from "lucide-react"
-import type { Task, TaskType, TaskPriority, TaskStatus } from "@/types/task"
-import { mockTasks } from "@/data/mock-tasks"
+import type { Task, TaskType, TaskPriority, TaskStatus, TaskFilter } from "@/types/task"
+import { useTasks, useChangeTaskStatus } from "@/hooks/use-tasks"
 import { TaskCreate } from "./TaskCreate"
 
 // -- Config maps --
@@ -171,7 +173,7 @@ function TaskCard({ task, onClick }: { task: Task; onClick: () => void }) {
             <Clock className="h-3 w-3" />
             <span>{formatDeadline(task.deadline)}</span>
           </div>
-          {task.comments.length > 0 && (
+          {(task.comments?.length ?? 0) > 0 && (
             <div className="flex items-center gap-1">
               <MessageSquare className="h-3 w-3" />
               <span>{task.comments.length}</span>
@@ -191,38 +193,44 @@ export function TaskBoard() {
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [priorityFilter, setPriorityFilter] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
   const [createOpen, setCreateOpen] = useState(false)
 
-  const filteredTasks = useMemo(() => {
-    return mockTasks.filter((task) => {
-      if (typeFilter !== "all" && task.type !== typeFilter) return false
-      if (priorityFilter !== "all" && task.priority !== priorityFilter)
-        return false
-      if (
-        searchQuery &&
-        !task.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        !task.description.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-        return false
-      return true
-    })
-  }, [typeFilter, priorityFilter, searchQuery])
+  const changeStatus = useChangeTaskStatus()
+
+  // Build filters for API
+  const filters = useMemo<TaskFilter>(() => {
+    const f: TaskFilter = { per_page: 100 } // Load more for board view
+    if (debouncedSearch) f.search = debouncedSearch
+    if (typeFilter !== "all") f.type = typeFilter as TaskType
+    if (priorityFilter !== "all") f.priority = priorityFilter as TaskPriority
+    return f
+  }, [debouncedSearch, typeFilter, priorityFilter])
+
+  const { data, isLoading, isFetching } = useTasks(filters)
+  const allTasks = data?.data ?? []
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value)
+    const timeout = setTimeout(() => setDebouncedSearch(value), 300)
+    return () => clearTimeout(timeout)
+  }
 
   const tasksByStatus = useMemo(() => {
     const map: Record<string, Task[]> = {}
     for (const col of columns) {
-      map[col.key] = filteredTasks.filter((t) => t.status === col.key)
+      map[col.key] = allTasks.filter((t) => t.status === col.key)
     }
     return map
-  }, [filteredTasks])
+  }, [allTasks])
 
   const stats = useMemo(() => {
-    const total = mockTasks.length
-    const pending = mockTasks.filter((t) => t.status === "pending").length
-    const inProgress = mockTasks.filter((t) => t.status === "in_progress").length
-    const completed = mockTasks.filter((t) => t.status === "completed").length
+    const total = allTasks.length
+    const pending = allTasks.filter((t) => t.status === "pending").length
+    const inProgress = allTasks.filter((t) => t.status === "in_progress").length
+    const completed = allTasks.filter((t) => t.status === "completed").length
     return { total, pending, inProgress, completed }
-  }, [])
+  }, [allTasks])
 
   const handleTaskClick = (taskId: string) => {
     navigate(`/cong-viec/${taskId}`)
@@ -349,7 +357,7 @@ export function TaskBoard() {
             <Input
               placeholder="Tìm kiếm công việc..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="pl-9"
             />
           </div>
@@ -357,56 +365,76 @@ export function TaskBoard() {
       </div>
 
       {/* Kanban Board */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {columns.map((col) => {
-          const tasks = tasksByStatus[col.key] || []
-          return (
+      {isLoading ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {columns.map((col) => (
             <div key={col.key} className="flex flex-col">
-              {/* Column header */}
-              <div
-                className={`flex items-center justify-between rounded-t-lg px-3 py-2.5 ${col.headerBg}`}
-              >
+              <div className={`flex items-center justify-between rounded-t-lg px-3 py-2.5 ${col.headerBg}`}>
                 <div className="flex items-center gap-2">
-                  <span
-                    className={`h-2.5 w-2.5 rounded-full ${col.dotColor}`}
-                  />
-                  <span
-                    className={`text-[13px] font-semibold ${col.headerText}`}
-                  >
-                    {col.label}
-                  </span>
+                  <span className={`h-2.5 w-2.5 rounded-full ${col.dotColor}`} />
+                  <span className={`text-[13px] font-semibold ${col.headerText}`}>{col.label}</span>
                 </div>
-                <span
-                  className={`rounded-md px-1.5 py-px text-[11px] font-semibold tabular-nums ${col.headerText}`}
-                >
-                  {tasks.length}
-                </span>
               </div>
-
-              {/* Column body */}
-              <div className="flex-1 rounded-b-lg border border-t-0 border-border/50 bg-muted/30">
-                <ScrollArea className="h-[calc(100vh-420px)] min-h-[300px]">
-                  <div className="space-y-3 p-3">
-                    {tasks.length === 0 ? (
-                      <p className="py-8 text-center text-xs text-muted-foreground">
-                        Không có công việc
-                      </p>
-                    ) : (
-                      tasks.map((task) => (
-                        <TaskCard
-                          key={task.id}
-                          task={task}
-                          onClick={() => handleTaskClick(task.id)}
-                        />
-                      ))
-                    )}
-                  </div>
-                </ScrollArea>
+              <div className="flex-1 rounded-b-lg border border-t-0 border-border/50 bg-muted/30 p-3 space-y-3">
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <Skeleton key={i} className="h-32 w-full rounded-lg" />
+                ))}
               </div>
             </div>
-          )
-        })}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {columns.map((col) => {
+            const tasks = tasksByStatus[col.key] || []
+            return (
+              <div key={col.key} className="flex flex-col">
+                {/* Column header */}
+                <div
+                  className={`flex items-center justify-between rounded-t-lg px-3 py-2.5 ${col.headerBg}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`h-2.5 w-2.5 rounded-full ${col.dotColor}`}
+                    />
+                    <span
+                      className={`text-[13px] font-semibold ${col.headerText}`}
+                    >
+                      {col.label}
+                    </span>
+                  </div>
+                  <span
+                    className={`rounded-md px-1.5 py-px text-[11px] font-semibold tabular-nums ${col.headerText}`}
+                  >
+                    {tasks.length}
+                  </span>
+                </div>
+
+                {/* Column body */}
+                <div className="flex-1 rounded-b-lg border border-t-0 border-border/50 bg-muted/30">
+                  <ScrollArea className="h-[calc(100vh-420px)] min-h-[300px]">
+                    <div className="space-y-3 p-3">
+                      {tasks.length === 0 ? (
+                        <p className="py-8 text-center text-xs text-muted-foreground">
+                          Không có công việc
+                        </p>
+                      ) : (
+                        tasks.map((task) => (
+                          <TaskCard
+                            key={task.id}
+                            task={task}
+                            onClick={() => handleTaskClick(task.id)}
+                          />
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Mobile FAB */}
       <div className="fixed bottom-6 right-6 sm:hidden">

@@ -34,6 +34,7 @@ import {
   Send,
   Sparkles,
 } from "lucide-react"
+import { useCreateJob } from "@/hooks/use-jobs"
 
 // ─── Zod Schema ──────────────────────────────────────────────────────────────
 
@@ -51,32 +52,32 @@ const jobCreateSchema = z.object({
   benefits: z
     .string()
     .min(10, "Quyền lợi phải có ít nhất 10 ký tự"),
-  salaryMin: z.coerce
+  salary_min: z.coerce
     .number({ message: "Vui lòng nhập số" })
     .min(0, "Lương tối thiểu không được âm"),
-  salaryMax: z.coerce
+  salary_max: z.coerce
     .number({ message: "Vui lòng nhập số" })
     .min(0, "Lương tối đa không được âm"),
-  salaryType: z.enum(["hourly", "daily", "monthly"], {
+  salary_type: z.enum(["hourly", "daily", "monthly"], {
     message: "Vui lòng chọn kiểu lương",
   }),
   city: z.string().min(1, "Vui lòng chọn thành phố"),
   district: z.string().min(1, "Vui lòng nhập quận/huyện"),
-  address: z.string().min(5, "Vui lòng nhập địa chỉ cụ thể"),
-  jobType: z.enum(["full-time", "part-time", "seasonal"], {
+  location: z.string().min(5, "Vui lòng nhập địa chỉ cụ thể"),
+  job_type: z.enum(["full_time", "part_time", "contract", "temporary"], {
     message: "Vui lòng chọn loại công việc",
   }),
-  positions: z.coerce
+  positions_count: z.coerce
     .number({ message: "Vui lòng nhập số" })
     .min(1, "Số lượng phải từ 1 trở lên")
     .max(100, "Số lượng không vượt quá 100"),
-  startDate: z.string().min(1, "Vui lòng chọn ngày bắt đầu"),
-  endDate: z.string().min(1, "Vui lòng chọn ngày kết thúc"),
+  start_date: z.string().min(1, "Vui lòng chọn ngày bắt đầu"),
+  end_date: z.string().min(1, "Vui lòng chọn ngày kết thúc"),
 }).refine(
-  (data) => data.salaryMax >= data.salaryMin,
+  (data) => data.salary_max >= data.salary_min,
   {
     message: "Lương tối đa phải lớn hơn hoặc bằng lương tối thiểu",
-    path: ["salaryMax"],
+    path: ["salary_max"],
   }
 )
 
@@ -113,6 +114,7 @@ function FormField({
 
 export function JobCreate() {
   const navigate = useNavigate()
+  const createJob = useCreateJob()
 
   const {
     register,
@@ -126,29 +128,45 @@ export function JobCreate() {
       description: "",
       requirements: "",
       benefits: "",
-      salaryMin: 0,
-      salaryMax: 0,
-      salaryType: "monthly",
+      salary_min: 0,
+      salary_max: 0,
+      salary_type: "monthly",
       city: "",
       district: "",
-      address: "",
-      jobType: "full-time",
-      positions: 1,
-      startDate: "",
-      endDate: "",
+      location: "",
+      job_type: "full_time",
+      positions_count: 1,
+      start_date: "",
+      end_date: "",
     },
   })
 
-  const onSubmit = (data: JobCreateFormData) => {
-    // TODO: Call API to create job posting
-    console.log("Submit job:", data)
+  const onSubmit = async (data: JobCreateFormData) => {
+    await createJob.mutateAsync({
+      title: data.title,
+      description: data.description,
+      requirements: data.requirements,
+      benefits: data.benefits,
+      salary_min: data.salary_min,
+      salary_max: data.salary_max,
+      salary_type: data.salary_type,
+      city: data.city,
+      district: data.district,
+      location: data.location,
+      job_type: data.job_type,
+      positions_count: data.positions_count,
+      start_date: data.start_date || null,
+      end_date: data.end_date || null,
+    })
     navigate("/jobs")
   }
 
   const onSaveDraft = () => {
-    // TODO: Save draft
+    // TODO: Save draft via API
     console.log("Save draft")
   }
+
+  const isBusy = isSubmitting || createJob.isPending
 
   return (
     <div className="space-y-6">
@@ -272,37 +290,37 @@ export function JobCreate() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <FormField
                 label="Lương tối thiểu (VNĐ)"
-                error={errors.salaryMin?.message}
+                error={errors.salary_min?.message}
                 required
               >
                 <Input
                   type="number"
                   placeholder="5000000"
-                  {...register("salaryMin")}
-                  aria-invalid={!!errors.salaryMin}
+                  {...register("salary_min")}
+                  aria-invalid={!!errors.salary_min}
                 />
               </FormField>
 
               <FormField
                 label="Lương tối đa (VNĐ)"
-                error={errors.salaryMax?.message}
+                error={errors.salary_max?.message}
                 required
               >
                 <Input
                   type="number"
                   placeholder="10000000"
-                  {...register("salaryMax")}
-                  aria-invalid={!!errors.salaryMax}
+                  {...register("salary_max")}
+                  aria-invalid={!!errors.salary_max}
                 />
               </FormField>
 
               <FormField
                 label="Kiểu lương"
-                error={errors.salaryType?.message}
+                error={errors.salary_type?.message}
                 required
               >
                 <Controller
-                  name="salaryType"
+                  name="salary_type"
                   control={control}
                   render={({ field }) => (
                     <Select
@@ -311,7 +329,7 @@ export function JobCreate() {
                     >
                       <SelectTrigger
                         className="w-full"
-                        aria-invalid={!!errors.salaryType}
+                        aria-invalid={!!errors.salary_type}
                       >
                         <SelectValue placeholder="Chọn kiểu lương" />
                       </SelectTrigger>
@@ -386,13 +404,13 @@ export function JobCreate() {
 
               <FormField
                 label="Địa chỉ cụ thể"
-                error={errors.address?.message}
+                error={errors.location?.message}
                 required
               >
                 <Input
                   placeholder="Số nhà, tên đường..."
-                  {...register("address")}
-                  aria-invalid={!!errors.address}
+                  {...register("location")}
+                  aria-invalid={!!errors.location}
                 />
               </FormField>
             </div>
@@ -413,11 +431,11 @@ export function JobCreate() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <FormField
                 label="Loại công việc"
-                error={errors.jobType?.message}
+                error={errors.job_type?.message}
                 required
               >
                 <Controller
-                  name="jobType"
+                  name="job_type"
                   control={control}
                   render={({ field }) => (
                     <Select
@@ -426,18 +444,21 @@ export function JobCreate() {
                     >
                       <SelectTrigger
                         className="w-full"
-                        aria-invalid={!!errors.jobType}
+                        aria-invalid={!!errors.job_type}
                       >
                         <SelectValue placeholder="Chọn loại" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="full-time">
+                        <SelectItem value="full_time">
                           Toàn thời gian
                         </SelectItem>
-                        <SelectItem value="part-time">
+                        <SelectItem value="part_time">
                           Bán thời gian
                         </SelectItem>
-                        <SelectItem value="seasonal">
+                        <SelectItem value="contract">
+                          Hợp đồng
+                        </SelectItem>
+                        <SelectItem value="temporary">
                           Thời vụ
                         </SelectItem>
                       </SelectContent>
@@ -448,7 +469,7 @@ export function JobCreate() {
 
               <FormField
                 label="Số lượng tuyển"
-                error={errors.positions?.message}
+                error={errors.positions_count?.message}
                 required
               >
                 <Input
@@ -456,32 +477,32 @@ export function JobCreate() {
                   min={1}
                   max={100}
                   placeholder="1"
-                  {...register("positions")}
-                  aria-invalid={!!errors.positions}
+                  {...register("positions_count")}
+                  aria-invalid={!!errors.positions_count}
                 />
               </FormField>
 
               <FormField
                 label="Ngày bắt đầu"
-                error={errors.startDate?.message}
+                error={errors.start_date?.message}
                 required
               >
                 <Input
                   type="date"
-                  {...register("startDate")}
-                  aria-invalid={!!errors.startDate}
+                  {...register("start_date")}
+                  aria-invalid={!!errors.start_date}
                 />
               </FormField>
 
               <FormField
                 label="Ngày kết thúc"
-                error={errors.endDate?.message}
+                error={errors.end_date?.message}
                 required
               >
                 <Input
                   type="date"
-                  {...register("endDate")}
-                  aria-invalid={!!errors.endDate}
+                  {...register("end_date")}
+                  aria-invalid={!!errors.end_date}
                 />
               </FormField>
             </div>
@@ -509,9 +530,9 @@ export function JobCreate() {
               <Save className="mr-1.5 h-3.5 w-3.5" />
               Lưu nháp
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isBusy}>
               <Send className="mr-1.5 h-3.5 w-3.5" />
-              {isSubmitting ? "Đang đăng..." : "Đăng tin"}
+              {isBusy ? "Đang đăng..." : "Đăng tin"}
             </Button>
           </div>
         </div>

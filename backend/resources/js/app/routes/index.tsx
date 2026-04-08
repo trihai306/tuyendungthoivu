@@ -2,35 +2,31 @@ import { createBrowserRouter } from "react-router-dom"
 import { MainLayout } from "@/components/layout/MainLayout"
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute"
 import { Dashboard } from "@/pages/Dashboard"
-import { ApplicationList } from "@/pages/applications/ApplicationList"
-import { InterviewSchedule } from "@/pages/interviews/InterviewSchedule"
-import { Reports } from "@/pages/reports/Reports"
-import { Settings } from "@/pages/settings/Settings"
-import { HelpPage } from "@/pages/help/HelpPage"
+import { OrderList } from "@/pages/orders/OrderList"
+import { OrderCreate } from "@/pages/orders/OrderCreate"
+import { OrderDetail } from "@/pages/orders/OrderDetail"
+import { ClientList } from "@/pages/clients/ClientList"
+import { ClientDetail } from "@/pages/clients/ClientDetail"
 import { WorkerList } from "@/pages/workers/WorkerList"
 import { WorkerDetail } from "@/pages/workers/WorkerDetail"
-import { EmployerList } from "@/pages/employers/EmployerList"
-import { EmployerDetail } from "@/pages/employers/EmployerDetail"
-import { JobList } from "@/pages/jobs/JobList"
-import { JobDetail } from "@/pages/jobs/JobDetail"
-import { JobCreate } from "@/pages/jobs/JobCreate"
-import { TaskBoard } from "@/pages/tasks/TaskBoard"
-import { TaskList } from "@/pages/tasks/TaskList"
-import { TaskDetail } from "@/pages/tasks/TaskDetail"
+import { DispatchBoard } from "@/pages/dispatch/DispatchBoard"
+import { AttendanceList } from "@/pages/attendance/AttendanceList"
+import { PayrollList } from "@/pages/payroll/PayrollList"
+import { InvoiceList } from "@/pages/invoices/InvoiceList"
+import { Reports } from "@/pages/reports/Reports"
+import { Settings } from "@/pages/settings/Settings"
+import { StaffList } from "@/pages/staff/StaffList"
+import { StaffDetail } from "@/pages/staff/StaffDetail"
+import { RoleList } from "@/pages/rbac/RoleList"
+import { RoleDetail } from "@/pages/rbac/RoleDetail"
 import { Login } from "@/pages/Login"
 import { Register } from "@/pages/Register"
 import { ForgotPassword } from "@/pages/ForgotPassword"
-import { RoleList } from "@/pages/rbac/RoleList"
-import { RoleDetail } from "@/pages/rbac/RoleDetail"
-import { ActivityLogPage } from "@/pages/rbac/ActivityLogPage"
-import { StaffList } from "@/pages/staff/StaffList"
-import { StaffDetail } from "@/pages/staff/StaffDetail"
-import { DepartmentList } from "@/pages/staff/DepartmentList"
-import { TeamDetail } from "@/pages/staff/TeamDetail"
 import { NotFound } from "@/pages/errors/NotFound"
 import { ServerError } from "@/pages/errors/ServerError"
 import { Forbidden } from "@/pages/errors/Forbidden"
 import { Maintenance } from "@/pages/errors/Maintenance"
+import { NotificationPage } from "@/pages/notifications/NotificationPage"
 
 export const router = createBrowserRouter([
   // Public routes
@@ -49,35 +45,39 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Dashboard /> },
 
-      // Recruitment
-      { path: "jobs", element: <JobList /> },
-      { path: "jobs/create", element: <JobCreate /> },
-      { path: "jobs/:id", element: <JobDetail /> },
-      { path: "candidates", element: <WorkerList /> },
-      { path: "candidates/:id", element: <WorkerDetail /> },
-      { path: "employers", element: <EmployerList /> },
-      { path: "employers/:id", element: <EmployerDetail /> },
-      { path: "applications", element: <ApplicationList /> },
-      { path: "interviews", element: <InterviewSchedule /> },
+      // Orders (staffing requests from clients)
+      { path: "orders", element: <OrderList /> },
+      { path: "orders/create", element: <OrderCreate /> },
+      { path: "orders/:id", element: <OrderDetail /> },
 
-      // Task management
-      { path: "tasks", element: <TaskBoard /> },
-      { path: "tasks/list", element: <TaskList /> },
-      { path: "tasks/:id", element: <TaskDetail /> },
+      // Clients
+      { path: "clients", element: <ClientList /> },
+      { path: "clients/:id", element: <ClientDetail /> },
+
+      // Workers
+      { path: "workers", element: <WorkerList /> },
+      { path: "workers/:id", element: <WorkerDetail /> },
+
+      // Dispatch
+      { path: "dispatch", element: <DispatchBoard /> },
+
+      // Attendance
+      { path: "attendance", element: <AttendanceList /> },
+
+      // Finance
+      { path: "payroll", element: <PayrollList /> },
+      { path: "invoices", element: <InvoiceList /> },
+      { path: "reports", element: <Reports /> },
+
+      // Notifications
+      { path: "notifications", element: <NotificationPage /> },
 
       // System
-      { path: "reports", element: <Reports /> },
       { path: "settings", element: <Settings /> },
-      { path: "help", element: <HelpPage /> },
-
-      // Admin
       { path: "staff", element: <StaffList /> },
       { path: "staff/:id", element: <StaffDetail /> },
-      { path: "departments", element: <DepartmentList /> },
-      { path: "departments/:deptId/teams/:teamId", element: <TeamDetail /> },
       { path: "roles", element: <RoleList /> },
       { path: "roles/:id", element: <RoleDetail /> },
-      { path: "activity-logs", element: <ActivityLogPage /> },
     ],
   },
 
