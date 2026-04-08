@@ -8,18 +8,20 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Loader2, Eye, EyeOff, ArrowRight } from "lucide-react"
+import { useLogin } from "@/hooks/use-auth"
 
 const loginSchema = z.object({
-  email: z.string().min(1, "Vui lòng nhập email").email("Email không hợp lệ"),
+  login: z.string().min(1, "Vui lòng nhập email hoặc số điện thoại"),
   password: z.string().min(1, "Vui lòng nhập mật khẩu").min(6, "Mật khẩu phải có ít nhất 6 ký tự"),
 })
 
 type LoginFormData = z.infer<typeof loginSchema>
 
 export function Login() {
-  const [isLoading, setIsLoading] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
+  const loginMutation = useLogin()
+  const isLoading = loginMutation.isPending
 
   const {
     register,
@@ -27,19 +29,15 @@ export function Login() {
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { login: "", password: "" },
   })
 
   const onSubmit = async (data: LoginFormData) => {
-    setIsLoading(true)
     setServerError(null)
     try {
-      console.log("Login data:", data)
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-    } catch {
-      setServerError("Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.")
-    } finally {
-      setIsLoading(false)
+      await loginMutation.mutateAsync(data)
+    } catch (error: any) {
+      setServerError(error.message ?? "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.")
     }
   }
 
@@ -141,17 +139,17 @@ export function Login() {
             )}
 
             <div className="space-y-1.5">
-              <Label htmlFor="email" className="text-[13px] font-medium">Email</Label>
+              <Label htmlFor="login" className="text-[13px] font-medium">Email hoặc Số điện thoại</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="name@company.com"
+                id="login"
+                type="text"
+                placeholder="name@company.com hoặc 0912345678"
                 className="h-11 rounded-xl border-border/70 bg-muted/30 transition-all focus:bg-background"
-                aria-invalid={!!errors.email}
+                aria-invalid={!!errors.login}
                 disabled={isLoading}
-                {...register("email")}
+                {...register("login")}
               />
-              {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+              {errors.login && <p className="text-xs text-destructive">{errors.login.message}</p>}
             </div>
 
             <div className="space-y-1.5">

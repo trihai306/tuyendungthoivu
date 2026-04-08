@@ -19,7 +19,7 @@ export const authApi = {
     apiClient.post<{ message: string }>("/auth/logout").then((r) => r.data),
 
   getMe: () =>
-    apiClient.get<{ data: User }>("/auth/me").then((r) => r.data.data),
+    apiClient.get<{ user: User }>("/auth/me").then((r) => r.data.user),
 
   forgotPassword: (data: ForgotPasswordRequest) =>
     apiClient
