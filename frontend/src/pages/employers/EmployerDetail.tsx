@@ -152,7 +152,7 @@ export function EmployerDetail() {
         variant="ghost"
         size="sm"
         className="gap-1.5 text-muted-foreground hover:text-foreground -ml-2"
-        render={<Link to="/doanh-nghiep" />}
+        render={<Link to="/employers" />}
       >
         <ArrowLeft className="h-4 w-4" />
         Danh sách doanh nghiệp

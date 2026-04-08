@@ -85,7 +85,7 @@ export function ForgotPassword() {
               </CardHeader>
               <CardContent>
                 <Button asChild className="w-full">
-                  <Link to="/dang-nhap">Quay lại đăng nhập</Link>
+                  <Link to="/login">Quay lại đăng nhập</Link>
                 </Button>
               </CardContent>
             </>
@@ -132,7 +132,7 @@ export function ForgotPassword() {
 
                 <div className="mt-4 text-center">
                   <Link
-                    to="/dang-nhap"
+                    to="/login"
                     className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
                   >
                     <ArrowLeft className="h-3.5 w-3.5" />

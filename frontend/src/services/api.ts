@@ -31,8 +31,8 @@ apiClient.interceptors.response.use(
       if (error.response?.status === 401) {
         localStorage.removeItem(TOKEN_KEY);
         // Redirect to login if not already there
-        if (window.location.pathname !== "/dang-nhap") {
-          window.location.href = "/dang-nhap";
+        if (window.location.pathname !== "/login") {
+          window.location.href = "/login";
         }
       }
 

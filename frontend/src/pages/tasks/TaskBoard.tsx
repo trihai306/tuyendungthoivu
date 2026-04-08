@@ -230,7 +230,7 @@ export function TaskBoard() {
 
   const handleViewToggle = (mode: "board" | "list") => {
     if (mode === "list") {
-      navigate("/cong-viec/danh-sach")
+      navigate("/tasks/list")
     } else {
       setViewMode(mode)
     }

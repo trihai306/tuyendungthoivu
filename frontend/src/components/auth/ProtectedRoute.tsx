@@ -25,7 +25,7 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
 
   // TODO: Re-enable after backend API is connected
   // if (!isAuthenticated) {
-  //   return <Navigate to="/dang-nhap" state={{ from: location }} replace />;
+  //   return <Navigate to="/login" state={{ from: location }} replace />;
   // }
 
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {

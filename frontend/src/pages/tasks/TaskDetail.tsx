@@ -164,7 +164,7 @@ export function TaskDetail() {
         <Button
           variant="outline"
           className="mt-4"
-          onClick={() => navigate("/cong-viec")}
+          onClick={() => navigate("/tasks")}
         >
           <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
           Quay lại
@@ -216,7 +216,7 @@ export function TaskDetail() {
     <div className="space-y-6">
       {/* Back link */}
       <Link
-        to="/cong-viec"
+        to="/tasks"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />

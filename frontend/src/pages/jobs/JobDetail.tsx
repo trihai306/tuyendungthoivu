@@ -373,7 +373,7 @@ function JobNotFound() {
         variant="outline"
         size="sm"
         className="mt-4"
-        render={<Link to="/tin-tuyen-dung" />}
+        render={<Link to="/jobs" />}
       >
         <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
         Quay lại danh sách
@@ -406,7 +406,7 @@ export function JobDetail() {
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbLink render={<Link to="/tin-tuyen-dung" />}>
+            <BreadcrumbLink render={<Link to="/jobs" />}>
               Tin tuyển dụng
             </BreadcrumbLink>
           </BreadcrumbItem>
@@ -592,7 +592,7 @@ export function JobDetail() {
         <Button
           variant="ghost"
           size="sm"
-          render={<Link to="/tin-tuyen-dung" />}
+          render={<Link to="/jobs" />}
         >
           <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
           Quay lại danh sách tin tuyển dụng

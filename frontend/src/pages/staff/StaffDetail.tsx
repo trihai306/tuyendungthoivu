@@ -215,7 +215,7 @@ export function StaffDetail() {
         variant="ghost"
         size="sm"
         className="gap-1.5 text-muted-foreground hover:text-foreground -ml-2"
-        render={<Link to="/nhan-su" />}
+        render={<Link to="/staff" />}
       >
         <ArrowLeft className="h-4 w-4" />
         Danh sách nhân sự

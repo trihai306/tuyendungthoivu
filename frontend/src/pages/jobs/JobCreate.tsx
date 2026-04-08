@@ -142,7 +142,7 @@ export function JobCreate() {
   const onSubmit = (data: JobCreateFormData) => {
     // TODO: Call API to create job posting
     console.log("Submit job:", data)
-    navigate("/tin-tuyen-dung")
+    navigate("/jobs")
   }
 
   const onSaveDraft = () => {
@@ -162,7 +162,7 @@ export function JobCreate() {
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbLink render={<Link to="/tin-tuyen-dung" />}>
+            <BreadcrumbLink render={<Link to="/jobs" />}>
               Tin tuyển dụng
             </BreadcrumbLink>
           </BreadcrumbItem>
@@ -494,7 +494,7 @@ export function JobCreate() {
             type="button"
             variant="ghost"
             size="sm"
-            render={<Link to="/tin-tuyen-dung" />}
+            render={<Link to="/jobs" />}
           >
             <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
             Quay lại

@@ -199,7 +199,7 @@ export function TeamDetail() {
         variant="ghost"
         size="sm"
         className="gap-1.5 text-muted-foreground hover:text-foreground -ml-2"
-        render={<Link to="/phong-ban" />}
+        render={<Link to="/departments" />}
       >
         <ArrowLeft className="h-4 w-4" />
         Phòng ban & Nhóm

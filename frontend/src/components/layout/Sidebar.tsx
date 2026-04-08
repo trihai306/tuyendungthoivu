@@ -30,25 +30,25 @@ interface NavItem {
 
 const mainNav: NavItem[] = [
   { title: "Tổng quan", href: "/", icon: Home },
-  { title: "Tin tuyển dụng", href: "/tin-tuyen-dung", icon: FileText, badge: 12 },
-  { title: "Ứng viên", href: "/ung-vien", icon: Users, badge: 48 },
-  { title: "Doanh nghiệp", href: "/doanh-nghiep", icon: Building },
-  { title: "Việc làm", href: "/viec-lam", icon: BriefcaseBusiness },
-  { title: "Lịch phỏng vấn", href: "/lich-phong-van", icon: CalendarDays },
-  { title: "Công việc", href: "/cong-viec", icon: ClipboardList, badge: 5 },
+  { title: "Tin tuyển dụng", href: "/jobs", icon: FileText, badge: 12 },
+  { title: "Ứng viên", href: "/candidates", icon: Users, badge: 48 },
+  { title: "Doanh nghiệp", href: "/employers", icon: Building },
+  { title: "Ứng tuyển", href: "/applications", icon: BriefcaseBusiness },
+  { title: "Lịch phỏng vấn", href: "/interviews", icon: CalendarDays },
+  { title: "Công việc", href: "/tasks", icon: ClipboardList, badge: 5 },
 ]
 
 const secondaryNav: NavItem[] = [
-  { title: "Báo cáo", href: "/bao-cao", icon: BarChart3 },
-  { title: "Cài đặt", href: "/cai-dat", icon: Settings },
-  { title: "Trợ giúp", href: "/tro-giup", icon: HelpCircle },
+  { title: "Báo cáo", href: "/reports", icon: BarChart3 },
+  { title: "Cài đặt", href: "/settings", icon: Settings },
+  { title: "Trợ giúp", href: "/help", icon: HelpCircle },
 ]
 
 const adminNav: NavItem[] = [
-  { title: "Nhân sự", href: "/nhan-su", icon: UserCog },
-  { title: "Phòng ban", href: "/phong-ban", icon: Building },
-  { title: "Phân quyền", href: "/phan-quyen", icon: Shield },
-  { title: "Nhật ký", href: "/nhat-ky", icon: History },
+  { title: "Nhân sự", href: "/staff", icon: UserCog },
+  { title: "Phòng ban", href: "/departments", icon: Building },
+  { title: "Phân quyền", href: "/roles", icon: Shield },
+  { title: "Nhật ký", href: "/activity-logs", icon: History },
 ]
 
 interface SidebarNavProps {

@@ -215,7 +215,7 @@ export function RoleDetail() {
           variant="outline"
           size="sm"
           className="mt-4 gap-1.5"
-          render={<Link to="/phan-quyen" />}
+          render={<Link to="/roles" />}
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Quay lại danh sách
@@ -235,7 +235,7 @@ export function RoleDetail() {
         variant="ghost"
         size="sm"
         className="gap-1.5 text-muted-foreground hover:text-foreground -ml-2"
-        render={<Link to="/phan-quyen" />}
+        render={<Link to="/roles" />}
       >
         <ArrowLeft className="h-3.5 w-3.5" />
         Phân quyền

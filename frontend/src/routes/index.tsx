@@ -33,21 +33,12 @@ import { Forbidden } from "@/pages/errors/Forbidden"
 import { Maintenance } from "@/pages/errors/Maintenance"
 
 export const router = createBrowserRouter([
-  // Public routes (auth)
-  {
-    path: "/dang-nhap",
-    element: <Login />,
-  },
-  {
-    path: "/dang-ky",
-    element: <Register />,
-  },
-  {
-    path: "/quen-mat-khau",
-    element: <ForgotPassword />,
-  },
+  // Public routes
+  { path: "/login", element: <Login /> },
+  { path: "/register", element: <Register /> },
+  { path: "/forgot-password", element: <ForgotPassword /> },
 
-  // Protected routes (require authentication)
+  // Protected routes
   {
     path: "/",
     element: (
@@ -56,116 +47,43 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      {
-        index: true,
-        element: <Dashboard />,
-      },
-      {
-        path: "viec-lam",
-        element: <ApplicationList />,
-      },
-      {
-        path: "lich-phong-van",
-        element: <InterviewSchedule />,
-      },
-      {
-        path: "cong-viec",
-        element: <TaskBoard />,
-      },
-      {
-        path: "cong-viec/danh-sach",
-        element: <TaskList />,
-      },
-      {
-        path: "cong-viec/:id",
-        element: <TaskDetail />,
-      },
-      {
-        path: "bao-cao",
-        element: <Reports />,
-      },
-      {
-        path: "cai-dat",
-        element: <Settings />,
-      },
-      {
-        path: "ung-vien",
-        element: <WorkerList />,
-      },
-      {
-        path: "ung-vien/:id",
-        element: <WorkerDetail />,
-      },
-      {
-        path: "doanh-nghiep",
-        element: <EmployerList />,
-      },
-      {
-        path: "doanh-nghiep/:id",
-        element: <EmployerDetail />,
-      },
-      {
-        path: "tin-tuyen-dung",
-        element: <JobList />,
-      },
-      {
-        path: "tin-tuyen-dung/tao-moi",
-        element: <JobCreate />,
-      },
-      {
-        path: "tin-tuyen-dung/:id",
-        element: <JobDetail />,
-      },
-      {
-        path: "phan-quyen",
-        element: <RoleList />,
-      },
-      {
-        path: "phan-quyen/:id",
-        element: <RoleDetail />,
-      },
-      {
-        path: "nhat-ky",
-        element: <ActivityLogPage />,
-      },
-      {
-        path: "nhan-su",
-        element: <StaffList />,
-      },
-      {
-        path: "nhan-su/:id",
-        element: <StaffDetail />,
-      },
-      {
-        path: "phong-ban",
-        element: <DepartmentList />,
-      },
-      {
-        path: "phong-ban/:deptId/nhom/:teamId",
-        element: <TeamDetail />,
-      },
-      {
-        path: "tro-giup",
-        element: <HelpPage />,
-      },
+      { index: true, element: <Dashboard /> },
+
+      // Recruitment
+      { path: "jobs", element: <JobList /> },
+      { path: "jobs/create", element: <JobCreate /> },
+      { path: "jobs/:id", element: <JobDetail /> },
+      { path: "candidates", element: <WorkerList /> },
+      { path: "candidates/:id", element: <WorkerDetail /> },
+      { path: "employers", element: <EmployerList /> },
+      { path: "employers/:id", element: <EmployerDetail /> },
+      { path: "applications", element: <ApplicationList /> },
+      { path: "interviews", element: <InterviewSchedule /> },
+
+      // Task management
+      { path: "tasks", element: <TaskBoard /> },
+      { path: "tasks/list", element: <TaskList /> },
+      { path: "tasks/:id", element: <TaskDetail /> },
+
+      // System
+      { path: "reports", element: <Reports /> },
+      { path: "settings", element: <Settings /> },
+      { path: "help", element: <HelpPage /> },
+
+      // Admin
+      { path: "staff", element: <StaffList /> },
+      { path: "staff/:id", element: <StaffDetail /> },
+      { path: "departments", element: <DepartmentList /> },
+      { path: "departments/:deptId/teams/:teamId", element: <TeamDetail /> },
+      { path: "roles", element: <RoleList /> },
+      { path: "roles/:id", element: <RoleDetail /> },
+      { path: "activity-logs", element: <ActivityLogPage /> },
     ],
   },
 
   // Error routes
-  {
-    path: "/403",
-    element: <Forbidden />,
-  },
-  {
-    path: "/500",
-    element: <ServerError />,
-  },
-  {
-    path: "/bao-tri",
-    element: <Maintenance />,
-  },
-  {
-    path: "*",
-    element: <NotFound />,
-  },
+  { path: "/403", element: <Forbidden /> },
+  { path: "/500", element: <ServerError /> },
+  { path: "/maintenance", element: <Maintenance /> },
+  { path: "*", element: <NotFound /> },
 ])

@@ -297,7 +297,7 @@ export function Register() {
 
             <div className="mt-4 text-center text-sm text-muted-foreground">
               Đã có tài khoản?{" "}
-              <Link to="/dang-nhap" className="text-primary hover:underline">
+              <Link to="/login" className="text-primary hover:underline">
                 Đăng nhập
               </Link>
             </div>

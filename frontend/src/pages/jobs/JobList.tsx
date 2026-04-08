@@ -374,7 +374,7 @@ export function JobList() {
             <Button
               size="sm"
               className="bg-white text-primary hover:bg-white/90 shadow-sm"
-              render={<Link to="/tin-tuyen-dung/tao-moi" />}
+              render={<Link to="/jobs/create" />}
             >
               <Plus className="mr-1.5 h-3.5 w-3.5" />
               Đăng tin mới

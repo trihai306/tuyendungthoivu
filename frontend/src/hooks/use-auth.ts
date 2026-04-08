@@ -47,7 +47,7 @@ export function useLogout() {
     onSuccess: () => {
       queryClient.clear();
       toast.success("Đã đăng xuất.");
-      navigate("/dang-nhap");
+      navigate("/login");
     },
   });
 }
@@ -85,7 +85,7 @@ export function useResetPassword() {
     mutationFn: authApi.resetPassword,
     onSuccess: () => {
       toast.success("Đặt lại mật khẩu thành công! Vui lòng đăng nhập.");
-      navigate("/dang-nhap");
+      navigate("/login");
     },
     onError: (error: ApiError) => {
       toast.error(error.message ?? "Không thể đặt lại mật khẩu. Vui lòng thử lại.");

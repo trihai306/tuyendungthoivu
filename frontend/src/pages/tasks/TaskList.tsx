@@ -186,7 +186,7 @@ export function TaskList() {
 
   const handleViewToggle = (mode: "board" | "list") => {
     if (mode === "board") {
-      navigate("/cong-viec")
+      navigate("/tasks")
     }
   }
 
