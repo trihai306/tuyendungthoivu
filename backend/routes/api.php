@@ -176,6 +176,8 @@ Route::prefix('v1')->group(function () {
             Route::post('/check-in', [AttendanceNewController::class, 'checkIn']);
             Route::post('/check-out', [AttendanceNewController::class, 'checkOut']);
             Route::post('/bulk-check-in', [AttendanceNewController::class, 'bulkCheckIn']);
+            Route::post('/{id}/approve', [AttendanceNewController::class, 'approve']);
+            Route::post('/bulk-approve', [AttendanceNewController::class, 'bulkApprove']);
             Route::get('/daily-report/{orderId}', [AttendanceNewController::class, 'dailyReport']);
             Route::get('/weekly-report', [AttendanceNewController::class, 'weeklyReport']);
             Route::get('/monthly-report/{workerId}', [AttendanceNewController::class, 'monthlyReport']);
@@ -188,6 +190,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/{payroll}', [PayrollNewController::class, 'show']);
             Route::post('/calculate', [PayrollNewController::class, 'calculate']);
             Route::post('/bulk-calculate', [PayrollNewController::class, 'bulkCalculate']);
+            Route::post('/{payroll}/review', [PayrollNewController::class, 'review']);
             Route::post('/{payroll}/approve', [PayrollNewController::class, 'approve']);
             Route::post('/{payroll}/pay', [PayrollNewController::class, 'markPaid']);
             Route::post('/bulk-pay', [PayrollNewController::class, 'bulkPay']);

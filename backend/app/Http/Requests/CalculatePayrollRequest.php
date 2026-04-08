@@ -21,6 +21,11 @@ class CalculatePayrollRequest extends FormRequest
             'period_month' => ['required', 'integer', 'between:1,12'],
             'period_year' => ['required', 'integer', 'digits:4'],
             'order_id' => ['nullable', 'uuid', 'exists:staffing_orders,id'],
+            'period_start' => ['nullable', 'date', 'date_format:Y-m-d'],
+            'period_end' => ['nullable', 'date', 'date_format:Y-m-d', 'after_or_equal:period_start'],
+            'allowance' => ['nullable', 'numeric', 'min:0'],
+            'deduction' => ['nullable', 'numeric', 'min:0'],
+            'notes' => ['nullable', 'string', 'max:2000'],
         ];
     }
 

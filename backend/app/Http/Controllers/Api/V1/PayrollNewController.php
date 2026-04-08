@@ -89,8 +89,13 @@ class PayrollNewController extends Controller
         $workerId = $validated['worker_id'];
         $orderId = $validated['order_id'] ?? null;
 
-        $periodStart = Carbon::create($year, $month, 1)->startOfMonth();
-        $periodEnd = $periodStart->copy()->endOfMonth();
+        // Support flexible period (period_start/period_end) or default to full month
+        $periodStart = $request->filled('period_start')
+            ? Carbon::parse($request->input('period_start'))
+            : Carbon::create($year, $month, 1)->startOfMonth();
+        $periodEnd = $request->filled('period_end')
+            ? Carbon::parse($request->input('period_end'))
+            : Carbon::create($year, $month, 1)->endOfMonth();
 
         // Check for existing payroll
         $existing = PayrollRecord::where('worker_id', $workerId)
@@ -147,7 +152,11 @@ class PayrollNewController extends Controller
         };
 
         $overtimeAmount = $overtimeHours * ($overtimeRate > 0 ? $overtimeRate : $unitPrice * 1.5);
-        $netAmount = $baseAmount + $overtimeAmount;
+
+        // Support editable allowance and deduction
+        $allowanceAmount = (float) $request->input('allowance', 0);
+        $deductionAmount = (float) $request->input('deduction', 0);
+        $netAmount = $baseAmount + $overtimeAmount + $allowanceAmount - $deductionAmount;
 
         $payrollCode = PayrollRecord::generatePayrollCode();
 
@@ -164,10 +173,11 @@ class PayrollNewController extends Controller
             'rate_type' => $rateType,
             'base_amount' => $baseAmount,
             'overtime_amount' => $overtimeAmount,
-            'allowance_amount' => 0,
-            'deduction_amount' => 0,
+            'allowance_amount' => $allowanceAmount,
+            'deduction_amount' => $deductionAmount,
             'net_amount' => $netAmount,
             'status' => PayrollStatus::Draft,
+            'notes' => $request->input('notes'),
             'created_by' => $request->user()?->id,
         ]);
 
@@ -300,6 +310,33 @@ class PayrollNewController extends Controller
     }
 
     /**
+     * Review a payroll record (Draft -> Reviewed).
+     */
+    public function review(Request $request, string $payrollId): JsonResponse
+    {
+        $payroll = PayrollRecord::findOrFail($payrollId);
+
+        if ($payroll->status !== PayrollStatus::Draft) {
+            return response()->json([
+                'message' => 'Chi co the kiem tra phieu luong o trang thai nhap.',
+            ], 422);
+        }
+
+        $payroll->update([
+            'status' => PayrollStatus::Reviewed,
+            'reviewed_by' => $request->user()?->id,
+            'reviewed_at' => now(),
+        ]);
+
+        $payroll->load(['worker', 'order.client', 'reviewedByUser']);
+
+        return response()->json([
+            'data' => new PayrollNewResource($payroll),
+            'message' => 'Kiem tra phieu luong thanh cong.',
+        ]);
+    }
+
+    /**
      * Approve a payroll record.
      */
     public function approve(Request $request, string $payrollId): JsonResponse
@@ -366,7 +403,7 @@ class PayrollNewController extends Controller
     {
         $request->validate([
             'payroll_ids' => ['required', 'array', 'min:1'],
-            'payroll_ids.*' => ['required', 'uuid', 'exists:payrolls_new,id'],
+            'payroll_ids.*' => ['required', 'uuid', 'exists:payrolls_v2,id'],
             'payment_method' => ['nullable', 'string', 'in:cash,bank_transfer,check'],
         ]);
 

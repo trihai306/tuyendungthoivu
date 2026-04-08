@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Actions\StaffingOrder\ApproveStaffingOrder;
+use App\Actions\StaffingOrder\CreateStaffingOrder;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreStaffingOrderRequest;
@@ -13,6 +15,11 @@ use Illuminate\Http\Request;
 
 class StaffingOrderController extends Controller
 {
+    public function __construct(
+        private readonly CreateStaffingOrder $createStaffingOrder,
+        private readonly ApproveStaffingOrder $approveStaffingOrder,
+    ) {}
+
     /**
      * Display a paginated list of staffing orders.
      * Supports filtering by status, urgency, service_type, client_id, assigned_to, date range, search.
@@ -112,15 +119,14 @@ class StaffingOrderController extends Controller
 
     /**
      * Store a newly created staffing order.
+     * Delegates to CreateStaffingOrder action for activity logging and event dispatch.
      */
     public function store(StoreStaffingOrderRequest $request): JsonResponse
     {
-        $data = $request->validated();
-        $data['created_by'] = $request->user()->id;
-        $data['status'] = OrderStatus::Draft->value;
-
-        // order_code is auto-generated via model boot
-        $order = StaffingOrder::create($data);
+        $order = $this->createStaffingOrder->execute(
+            $request->validated(),
+            $request->user()
+        );
 
         return response()->json([
             'data' => new StaffingOrderResource($order->load('client')),
@@ -174,26 +180,19 @@ class StaffingOrderController extends Controller
 
     /**
      * Approve a staffing order (pending -> approved).
-     * Only managers can approve.
+     * Delegates to ApproveStaffingOrder action for validation, logging, and events.
      */
     public function approve(Request $request, string $order): JsonResponse
     {
         $order = StaffingOrder::findOrFail($order);
 
-        if ($order->status !== OrderStatus::Pending) {
-            return response()->json([
-                'message' => 'Chi co the duyet don hang o trang thai cho duyet.',
-            ], 422);
-        }
-
-        $order->update([
-            'status' => OrderStatus::Approved,
-            'approved_by' => $request->user()->id,
-            'approved_at' => now(),
-        ]);
+        $approvedOrder = $this->approveStaffingOrder->execute(
+            $order,
+            $request->user()
+        );
 
         return response()->json([
-            'data' => new StaffingOrderResource($order->fresh()->load('client', 'approvedBy')),
+            'data' => new StaffingOrderResource($approvedOrder->load('client', 'approvedBy')),
             'message' => 'Duyet don hang thanh cong',
         ]);
     }

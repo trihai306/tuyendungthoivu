@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AttendanceStatus;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,9 +15,14 @@ class AttendanceRecord extends Model
     use HasFactory, HasUuids;
 
     /**
+     * Grace period in minutes before a check-in is considered late.
+     */
+    const LATE_GRACE_MINUTES = 5;
+
+    /**
      * Use a separate table to avoid conflict with the legacy attendances table.
      */
-    protected $table = 'attendances_new';
+    protected $table = 'attendances_v2';
 
     protected $fillable = [
         'assignment_id',
@@ -220,6 +226,7 @@ class AttendanceRecord extends Model
 
     /**
      * Determine if the worker was late based on the order's start time.
+     * Uses LATE_GRACE_MINUTES constant for consistent grace period.
      */
     public function isLate(): bool
     {
@@ -227,13 +234,14 @@ class AttendanceRecord extends Model
             return false;
         }
 
-        $order = $this->staffingOrder;
-        if (!$order || !$order->start_time) {
+        $order = $this->staffingOrder ?? $this->workerAssignment?->staffingOrder;
+        if (!$order?->start_time) {
             return false;
         }
 
-        $expectedStart = $this->work_date->copy()->setTimeFromTimeString($order->start_time);
+        $graceDeadline = Carbon::parse($this->work_date->format('Y-m-d') . ' ' . $order->start_time)
+            ->addMinutes(self::LATE_GRACE_MINUTES);
 
-        return $this->check_in_time->gt($expectedStart);
+        return Carbon::parse($this->check_in_time)->gt($graceDeadline);
     }
 }

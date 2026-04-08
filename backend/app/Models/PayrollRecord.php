@@ -19,7 +19,7 @@ class PayrollRecord extends Model
     /**
      * Use a separate table to avoid conflict with the legacy payrolls table.
      */
-    protected $table = 'payrolls_new';
+    protected $table = 'payrolls_v2';
 
     protected $fillable = [
         'payroll_code',
@@ -38,6 +38,8 @@ class PayrollRecord extends Model
         'deduction_amount',
         'net_amount',
         'status',
+        'reviewed_by',
+        'reviewed_at',
         'approved_by',
         'approved_at',
         'paid_at',
@@ -60,6 +62,7 @@ class PayrollRecord extends Model
             'payment_method' => PaymentMethod::class,
             'period_start' => 'date',
             'period_end' => 'date',
+            'reviewed_at' => 'datetime',
             'approved_at' => 'datetime',
             'paid_at' => 'datetime',
             'total_days' => 'integer',
@@ -109,6 +112,22 @@ class PayrollRecord extends Model
     public function order(): BelongsTo
     {
         return $this->staffingOrder();
+    }
+
+    /**
+     * The user who reviewed this payroll.
+     */
+    public function reviewedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    /**
+     * Alias for reviewedBy.
+     */
+    public function reviewedByUser(): BelongsTo
+    {
+        return $this->reviewedBy();
     }
 
     /**

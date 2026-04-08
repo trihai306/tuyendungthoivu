@@ -17,7 +17,7 @@ class CheckOutRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'attendance_id' => ['required', 'uuid', 'exists:attendances_new,id'],
+            'attendance_id' => ['required', 'uuid', 'exists:attendances_v2,id'],
             'check_out' => ['required', 'date_format:H:i'],
             'gps_lat' => ['nullable', 'numeric', 'between:-90,90'],
             'gps_lng' => ['nullable', 'numeric', 'between:-180,180'],

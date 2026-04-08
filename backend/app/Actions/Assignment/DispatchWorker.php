@@ -67,6 +67,26 @@ class DispatchWorker
                 ]);
             }
 
+            // Check for overlapping assignments on other orders in the same date range
+            $overlap = Assignment::where('worker_id', $worker->id)
+                ->whereIn('status', [
+                    AssignmentStatus::Created,
+                    AssignmentStatus::Contacted,
+                    AssignmentStatus::Confirmed,
+                    AssignmentStatus::Working,
+                ])
+                ->whereHas('order', function ($q) use ($order) {
+                    $q->where('start_date', '<=', $order->end_date)
+                      ->where('end_date', '>=', $order->start_date);
+                })
+                ->exists();
+
+            if ($overlap) {
+                throw ValidationException::withMessages([
+                    'worker_id' => ["Worker '{$worker->full_name}' has an overlapping assignment during this period ({$order->start_date->format('d/m/Y')} - {$order->end_date->format('d/m/Y')})."],
+                ]);
+            }
+
             // Create the assignment
             $assignment = Assignment::create(array_merge([
                 'order_id' => $order->id,

@@ -13,6 +13,7 @@ use App\Models\Worker;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class AssignmentController extends Controller
 {
@@ -195,6 +196,21 @@ class AssignmentController extends Controller
 
         $assignment->update($updateData);
 
+        // Reset worker status to available if no other active assignments remain
+        if ($newStatus->isTerminal()) {
+            $worker = $assignment->worker;
+            if ($worker) {
+                $hasOtherActiveAssignments = Assignment::where('worker_id', $worker->id)
+                    ->where('id', '!=', $assignment->id)
+                    ->active()
+                    ->exists();
+
+                if (!$hasOtherActiveAssignments && $worker->status === WorkerStatus::Assigned) {
+                    $worker->update(['status' => WorkerStatus::Available]);
+                }
+            }
+        }
+
         return response()->json([
             'data' => new AssignmentResource($assignment->fresh()->load(['order.client', 'worker', 'assignedBy'])),
             'message' => 'Cap nhat trang thai phan cong thanh cong',
@@ -307,6 +323,19 @@ class AssignmentController extends Controller
 
             // Decrement order filled count
             $assignment->order->decrement('quantity_filled');
+
+            // Reset worker status to available if no other active assignments remain
+            $worker = $assignment->worker;
+            if ($worker) {
+                $hasOtherActiveAssignments = Assignment::where('worker_id', $worker->id)
+                    ->where('id', '!=', $assignment->id)
+                    ->active()
+                    ->exists();
+
+                if (!$hasOtherActiveAssignments && $worker->status === WorkerStatus::Assigned) {
+                    $worker->update(['status' => WorkerStatus::Available]);
+                }
+            }
         });
 
         return response()->json([

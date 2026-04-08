@@ -1,0 +1,27 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - link "NV NVTVStaffing" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e8]: NV
+        - generic [ref=e9]: NVTVStaffing
+      - button "Tìm kiếm... K" [ref=e11]:
+        - img [ref=e12]
+        - generic [ref=e15]: Tìm kiếm...
+        - generic
+      - generic [ref=e16]:
+        - button "Chuyển giao diện" [ref=e17]
+        - button "Thông báo" [ref=e20]
+  - generic [ref=e26]:
+    - complementary [ref=e27]:
+      - navigation [ref=e28]:
+        - generic [ref=e29]
+      - button "VH Nguyễn Văn Hải Giám đốc Vận hành" [ref=e117]:
+        - button "VH Nguyễn Văn Hải Giám đốc Vận hành" [ref=e118]
+    - main [ref=e127]:
+      - generic [ref=e129]:
+        - generic [ref=e133]
+        - generic [ref=e142]
+        - generic [ref=e210]
+        - generic [ref=e347]
+  - region "Notifications alt+T"

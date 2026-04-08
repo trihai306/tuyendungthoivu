@@ -85,15 +85,10 @@ class AttendanceNewController extends Controller
         }
 
         $checkInTime = Carbon::parse($validated['date'] . ' ' . $validated['check_in']);
+        $order = $assignment->order;
 
-        // Determine if late (based on order start_time)
-        $status = AttendanceStatus::Present;
-        if ($assignment->order && $assignment->order->start_time) {
-            $expectedStart = Carbon::parse($validated['date'] . ' ' . $assignment->order->start_time);
-            if ($checkInTime->gt($expectedStart->addMinutes(5))) {
-                $status = AttendanceStatus::Late;
-            }
-        }
+        // Auto-fill break_minutes from the staffing order
+        $breakMinutes = $order->break_minutes ?? 0;
 
         $record = AttendanceRecord::create([
             'assignment_id' => $assignment->id,
@@ -103,8 +98,14 @@ class AttendanceNewController extends Controller
             'check_in_time' => $checkInTime,
             'check_in_by' => $request->user()?->id,
             'check_in_note' => $validated['note'] ?? null,
-            'status' => $status,
+            'break_minutes' => $breakMinutes,
+            'status' => AttendanceStatus::Present,
         ]);
+
+        // Use model method for consistent late detection with grace period
+        if ($record->isLate()) {
+            $record->update(['status' => AttendanceStatus::Late]);
+        }
 
         $record->load(['worker', 'order.client', 'assignment']);
 
@@ -141,10 +142,22 @@ class AttendanceNewController extends Controller
             $totalHours = round(max(0, $netMinutes) / 60, 1);
         }
 
-        // Calculate overtime (hours beyond 8h standard)
+        // Calculate standard hours from order schedule instead of hardcoded 8h
         $overtimeHours = 0;
-        if ($totalHours && $totalHours > 8) {
-            $overtimeHours = round($totalHours - 8, 1);
+        if ($totalHours) {
+            $order = $record->staffingOrder;
+            $standardHours = 8; // Fallback default
+
+            if ($order && $order->start_time && $order->end_time) {
+                $shiftStart = Carbon::parse($order->start_time);
+                $shiftEnd = Carbon::parse($order->end_time);
+                $shiftMinutes = $shiftStart->diffInMinutes($shiftEnd);
+                $standardHours = round(($shiftMinutes - ($order->break_minutes ?? 0)) / 60, 1);
+            }
+
+            if ($totalHours > $standardHours) {
+                $overtimeHours = round($totalHours - $standardHours, 1);
+            }
         }
 
         $record->update([
@@ -349,6 +362,55 @@ class AttendanceNewController extends Controller
                 'records' => AttendanceNewResource::collection($records),
             ],
             'message' => 'Bao cao cham cong thang.',
+        ]);
+    }
+
+    /**
+     * Approve a single attendance record.
+     */
+    public function approve(Request $request, string $id): JsonResponse
+    {
+        $attendance = AttendanceRecord::findOrFail($id);
+
+        if ($attendance->is_approved) {
+            return response()->json([
+                'message' => 'Ban ghi cham cong da duoc phe duyet truoc do.',
+            ], 422);
+        }
+
+        $attendance->update([
+            'is_approved' => true,
+            'approved_by' => $request->user()->id,
+            'approved_at' => now(),
+        ]);
+
+        return response()->json([
+            'data' => new AttendanceNewResource($attendance->fresh(['worker', 'order.client', 'approvedBy'])),
+            'message' => 'Da phe duyet cham cong.',
+        ]);
+    }
+
+    /**
+     * Bulk approve multiple attendance records at once.
+     */
+    public function bulkApprove(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['required', 'uuid', 'exists:attendances_v2,id'],
+        ]);
+
+        $approvedCount = AttendanceRecord::whereIn('id', $validated['ids'])
+            ->where('is_approved', false)
+            ->update([
+                'is_approved' => true,
+                'approved_by' => $request->user()->id,
+                'approved_at' => now(),
+            ]);
+
+        return response()->json([
+            'data' => ['approved_count' => $approvedCount],
+            'message' => sprintf('Da phe duyet %d ban ghi cham cong.', $approvedCount),
         ]);
     }
 }
