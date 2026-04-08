@@ -48,7 +48,7 @@ export function Login() {
       {/* Left - Branding */}
       <div className="relative hidden w-[55%] overflow-hidden lg:block">
         {/* Full gradient background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary via-blue-600 to-indigo-700" />
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-primary to-violet-700" />
 
         {/* Pattern overlay */}
         <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)", backgroundSize: "40px 40px" }} />
@@ -56,7 +56,7 @@ export function Login() {
         {/* Decorative blobs */}
         <div className="absolute -left-20 -top-20 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
         <div className="absolute -bottom-32 -right-32 h-[500px] w-[500px] rounded-full bg-white/5 blur-3xl" />
-        <div className="absolute left-1/3 top-1/2 h-64 w-64 rounded-full bg-indigo-400/20 blur-3xl" />
+        <div className="absolute left-1/3 top-1/2 h-64 w-64 rounded-full bg-violet-400/20 blur-3xl" />
 
         <div className="relative flex h-full flex-col justify-between p-12 xl:p-16">
           {/* Logo */}
@@ -115,7 +115,7 @@ export function Login() {
         <div className="w-full max-w-[380px]">
           {/* Mobile logo */}
           <div className="mb-10 flex flex-col items-center gap-3 lg:hidden">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-indigo-600 shadow-lg shadow-primary/25">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-primary/25">
               <span className="text-base font-bold text-white">NV</span>
             </div>
             <div className="text-center">
