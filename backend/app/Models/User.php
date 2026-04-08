@@ -120,6 +120,32 @@ class User extends Authenticatable
             ->withPivot('role_in_team', 'joined_at');
     }
 
+    // ── Staffing Relationships ───────────────────────────────────────
+
+    /**
+     * Workers managed/registered by this user (as recruiter).
+     */
+    public function managedWorkers(): HasMany
+    {
+        return $this->hasMany(Worker::class, 'registered_by');
+    }
+
+    /**
+     * Staffing orders assigned to this user (as recruiter).
+     */
+    public function assignedOrders(): HasMany
+    {
+        return $this->hasMany(StaffingOrder::class, 'assigned_recruiter_id');
+    }
+
+    /**
+     * Staffing orders created by this user (as sales).
+     */
+    public function staffingOrdersCreated(): HasMany
+    {
+        return $this->hasMany(StaffingOrder::class, 'created_by');
+    }
+
     // ── Task Relationships ───────────────────────────────────────────
 
     /**

@@ -33,7 +33,7 @@ class RoleController extends Controller
      */
     public function show(string $id): JsonResponse
     {
-        $role = Role::with('permissions')->findOrFail($id);
+        $role = Role::with('permissions')->withCount('users')->findOrFail($id);
         return (new RoleResource($role))->response();
     }
 

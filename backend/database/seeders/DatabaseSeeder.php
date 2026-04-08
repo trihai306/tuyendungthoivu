@@ -41,6 +41,9 @@ class DatabaseSeeder extends Seeder
 
             // 11. Activity logs (50 entries)
             ActivityLogSeeder::class,
+
+            // 12. Staffing system data (clients, contracts, orders, workers, assignments, etc.)
+            StaffingSeeder::class,
         ]);
     }
 }

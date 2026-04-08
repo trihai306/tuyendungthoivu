@@ -12,7 +12,7 @@ class WorkerProfileController extends Controller
 {
     public function index(Request $request)
     {
-        $query = WorkerProfile::with(['user', 'skills']);
+        $query = WorkerProfile::with(['user']);
 
         if ($request->filled('search')) {
             $query->where('full_name', 'like', '%' . $request->search . '%');
@@ -43,12 +43,12 @@ class WorkerProfileController extends Controller
             ['user_id' => $request->user()->id]
         ));
 
-        return new WorkerProfileResource($profile->load(['user', 'skills']));
+        return new WorkerProfileResource($profile->load(['user']));
     }
 
     public function show(string $id)
     {
-        $profile = WorkerProfile::with(['user', 'skills', 'applications.jobPost'])->findOrFail($id);
+        $profile = WorkerProfile::with(['user', 'applications.jobPost'])->findOrFail($id);
 
         return new WorkerProfileResource($profile);
     }
@@ -59,7 +59,7 @@ class WorkerProfileController extends Controller
 
         $profile->update($request->validated());
 
-        return new WorkerProfileResource($profile->load(['user', 'skills']));
+        return new WorkerProfileResource($profile->load(['user']));
     }
 
     public function destroy(string $id)

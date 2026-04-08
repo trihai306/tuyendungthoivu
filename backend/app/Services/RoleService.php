@@ -19,7 +19,7 @@ class RoleService
      */
     public function list(array $filters): LengthAwarePaginator
     {
-        $query = Role::with('permissions')->byLevel();
+        $query = Role::with('permissions')->withCount('users')->byLevel();
 
         if (!empty($filters['search'])) {
             $query->where(function ($q) use ($filters) {
