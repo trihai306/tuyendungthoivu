@@ -21,6 +21,9 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        // Seed roles and permissions first (before any user assignment)
+        $this->call(RolesAndPermissionsSeeder::class);
+
         // Admin
         User::create([
             'name' => 'Admin',
@@ -380,5 +383,8 @@ class DatabaseSeeder extends Seeder
             'is_read' => true,
             'read_at' => now(),
         ]);
+
+        // Seed departments, teams, and assign admin role
+        $this->call(DepartmentsAndTeamsSeeder::class);
     }
 }

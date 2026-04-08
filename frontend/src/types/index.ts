@@ -46,3 +46,6 @@ export * from "./user";
 export * from "./job";
 export * from "./application";
 export * from "./notification";
+export * from "./task";
+export * from "./staff";
+export * from "./rbac";

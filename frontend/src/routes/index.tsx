@@ -14,9 +14,19 @@ import { EmployerDetail } from "@/pages/employers/EmployerDetail"
 import { JobList } from "@/pages/jobs/JobList"
 import { JobDetail } from "@/pages/jobs/JobDetail"
 import { JobCreate } from "@/pages/jobs/JobCreate"
+import { TaskBoard } from "@/pages/tasks/TaskBoard"
+import { TaskList } from "@/pages/tasks/TaskList"
+import { TaskDetail } from "@/pages/tasks/TaskDetail"
 import { Login } from "@/pages/Login"
 import { Register } from "@/pages/Register"
 import { ForgotPassword } from "@/pages/ForgotPassword"
+import { RoleList } from "@/pages/rbac/RoleList"
+import { RoleDetail } from "@/pages/rbac/RoleDetail"
+import { ActivityLogPage } from "@/pages/rbac/ActivityLogPage"
+import { StaffList } from "@/pages/staff/StaffList"
+import { StaffDetail } from "@/pages/staff/StaffDetail"
+import { DepartmentList } from "@/pages/staff/DepartmentList"
+import { TeamDetail } from "@/pages/staff/TeamDetail"
 import { NotFound } from "@/pages/errors/NotFound"
 import { ServerError } from "@/pages/errors/ServerError"
 import { Forbidden } from "@/pages/errors/Forbidden"
@@ -59,6 +69,18 @@ export const router = createBrowserRouter([
         element: <InterviewSchedule />,
       },
       {
+        path: "cong-viec",
+        element: <TaskBoard />,
+      },
+      {
+        path: "cong-viec/danh-sach",
+        element: <TaskList />,
+      },
+      {
+        path: "cong-viec/:id",
+        element: <TaskDetail />,
+      },
+      {
         path: "bao-cao",
         element: <Reports />,
       },
@@ -93,6 +115,34 @@ export const router = createBrowserRouter([
       {
         path: "tin-tuyen-dung/:id",
         element: <JobDetail />,
+      },
+      {
+        path: "phan-quyen",
+        element: <RoleList />,
+      },
+      {
+        path: "phan-quyen/:id",
+        element: <RoleDetail />,
+      },
+      {
+        path: "nhat-ky",
+        element: <ActivityLogPage />,
+      },
+      {
+        path: "nhan-su",
+        element: <StaffList />,
+      },
+      {
+        path: "nhan-su/:id",
+        element: <StaffDetail />,
+      },
+      {
+        path: "phong-ban",
+        element: <DepartmentList />,
+      },
+      {
+        path: "phong-ban/:deptId/nhom/:teamId",
+        element: <TeamDetail />,
       },
       {
         path: "tro-giup",

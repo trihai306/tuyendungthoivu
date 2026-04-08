@@ -7,11 +7,16 @@ import {
   Building,
   BriefcaseBusiness,
   CalendarDays,
+  ClipboardList,
   BarChart3,
   Settings,
   HelpCircle,
   LogOut,
   ChevronRight,
+  ShieldCheck,
+  History,
+  UserCog,
+  Shield,
   type LucideIcon,
 } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -30,12 +35,20 @@ const mainNav: NavItem[] = [
   { title: "Doanh nghiệp", href: "/doanh-nghiep", icon: Building },
   { title: "Việc làm", href: "/viec-lam", icon: BriefcaseBusiness },
   { title: "Lịch phỏng vấn", href: "/lich-phong-van", icon: CalendarDays },
+  { title: "Công việc", href: "/cong-viec", icon: ClipboardList, badge: 5 },
 ]
 
 const secondaryNav: NavItem[] = [
   { title: "Báo cáo", href: "/bao-cao", icon: BarChart3 },
   { title: "Cài đặt", href: "/cai-dat", icon: Settings },
   { title: "Trợ giúp", href: "/tro-giup", icon: HelpCircle },
+]
+
+const adminNav: NavItem[] = [
+  { title: "Nhân sự", href: "/nhan-su", icon: UserCog },
+  { title: "Phòng ban", href: "/phong-ban", icon: Building },
+  { title: "Phân quyền", href: "/phan-quyen", icon: Shield },
+  { title: "Nhật ký", href: "/nhat-ky", icon: History },
 ]
 
 interface SidebarNavProps {
@@ -47,7 +60,9 @@ export function AppSidebar({ open = true, onClose }: SidebarNavProps) {
   const location = useLocation()
 
   const renderNavItem = (item: NavItem) => {
-    const isActive = location.pathname === item.href
+    const isActive = item.href === "/"
+      ? location.pathname === "/"
+      : location.pathname === item.href || location.pathname.startsWith(item.href + "/")
     return (
       <Link
         key={item.href}
@@ -113,6 +128,17 @@ export function AppSidebar({ open = true, onClose }: SidebarNavProps) {
               </p>
               <div className="space-y-0.5">
                 {secondaryNav.map(renderNavItem)}
+              </div>
+            </div>
+
+            <div className="mx-3 h-px bg-border/70" />
+
+            <div>
+              <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted-foreground">
+                Quản trị
+              </p>
+              <div className="space-y-0.5">
+                {adminNav.map(renderNavItem)}
               </div>
             </div>
           </div>
