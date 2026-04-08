@@ -1,31 +1,18 @@
-import { clsx } from 'clsx';
-import type { TextareaHTMLAttributes } from 'react';
+import * as React from "react"
 
-interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
-  label?: string;
-  error?: string;
-}
+import { cn } from "@/lib/utils"
 
-export default function Textarea({ label, error, className, required, rows = 4, ...rest }: TextareaProps) {
+function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
   return (
-    <div className="w-full">
-      {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-          {label}
-          {required && <span className="text-red-500 ml-0.5">*</span>}
-        </label>
+    <textarea
+      data-slot="textarea"
+      className={cn(
+        "flex field-sizing-content min-h-16 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40",
+        className
       )}
-      <textarea
-        rows={rows}
-        className={clsx(
-          'block w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-colors duration-150',
-          'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
-          error ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300',
-          className
-        )}
-        {...rest}
-      />
-      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
-    </div>
-  );
+      {...props}
+    />
+  )
 }
+
+export { Textarea }

@@ -1,39 +1,20 @@
-import { clsx } from 'clsx';
-import type { InputHTMLAttributes, ReactNode } from 'react';
+import * as React from "react"
+import { Input as InputPrimitive } from "@base-ui/react/input"
 
-interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
-  label?: string;
-  error?: string;
-  icon?: ReactNode;
-}
+import { cn } from "@/lib/utils"
 
-export default function Input({ label, error, icon, className, required, ...rest }: InputProps) {
+function Input({ className, type, ...props }: React.ComponentProps<"input">) {
   return (
-    <div className="w-full">
-      {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-          {label}
-          {required && <span className="text-red-500 ml-0.5">*</span>}
-        </label>
+    <InputPrimitive
+      type={type}
+      data-slot="input"
+      className={cn(
+        "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40",
+        className
       )}
-      <div className="relative">
-        {icon && (
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-            {icon}
-          </div>
-        )}
-        <input
-          className={clsx(
-            'block w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-colors duration-150',
-            'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
-            error ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300',
-            icon && 'pl-10',
-            className
-          )}
-          {...rest}
-        />
-      </div>
-      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
-    </div>
-  );
+      {...props}
+    />
+  )
 }
+
+export { Input }
