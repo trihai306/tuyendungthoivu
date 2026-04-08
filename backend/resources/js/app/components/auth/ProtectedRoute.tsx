@@ -23,10 +23,9 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     );
   }
 
-  // TODO: Re-enable after backend API is connected
-  // if (!isAuthenticated) {
-  //   return <Navigate to="/login" state={{ from: location }} replace />;
-  // }
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
 
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
     return <Navigate to="/403" replace />;
