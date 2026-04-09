@@ -79,16 +79,16 @@ class StoreStaffingOrderRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'client_id.required' => 'Khach hang la bat buoc.',
-            'client_id.exists' => 'Khach hang khong ton tai.',
-            'position_name.required' => 'Vi tri tuyen dung la bat buoc.',
-            'quantity_needed.required' => 'So luong can tuyen la bat buoc.',
-            'quantity_needed.min' => 'So luong can tuyen phai it nhat la 1.',
-            'start_date.required' => 'Ngay bat dau la bat buoc.',
-            'start_date.after_or_equal' => 'Ngay bat dau phai tu hom nay tro di.',
-            'end_date.after_or_equal' => 'Ngay ket thuc phai sau hoac bang ngay bat dau.',
-            'service_type.required' => 'Loai dich vu la bat buoc.',
-            'age_max.gte' => 'Tuoi toi da phai lon hon hoac bang tuoi toi thieu.',
+            'client_id.required' => 'Khách hàng là bắt buộc.',
+            'client_id.exists' => 'Khách hàng không tồn tại.',
+            'position_name.required' => 'Vị trí tuyển dụng là bắt buộc.',
+            'quantity_needed.required' => 'Số lượng cần tuyển là bắt buộc.',
+            'quantity_needed.min' => 'Số lượng cần tuyển phải ít nhất là 1.',
+            'start_date.required' => 'Ngày bắt đầu là bắt buộc.',
+            'start_date.after_or_equal' => 'Ngày bắt đầu phải từ hôm nay trở đi.',
+            'end_date.after_or_equal' => 'Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.',
+            'service_type.required' => 'Loại dịch vụ là bắt buộc.',
+            'age_max.gte' => 'Tuổi tối đa phải lớn hơn hoặc bằng tuổi tối thiểu.',
         ];
     }
 }

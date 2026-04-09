@@ -67,6 +67,7 @@ export interface CreateJobPostRequest {
   positions_count: number;
   start_date?: string | null;
   end_date?: string | null;
+  status?: JobStatus;
 }
 
 export interface UpdateJobPostRequest extends Partial<CreateJobPostRequest> {

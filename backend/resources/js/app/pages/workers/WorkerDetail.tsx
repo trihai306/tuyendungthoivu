@@ -1,10 +1,18 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Link, useParams, useNavigate } from "react-router-dom"
+import { usePermissions } from "@/hooks/use-permissions"
+import { useWorkerNew, useUpdateWorkerNew, useWorkerEvaluation } from "@/hooks/use-workers-new"
+import type { WorkerWorkHistoryItem, WorkerAttendanceItem } from "@/services/workers-new.service"
+import type { WorkerNew, UpdateWorkerNewDto } from "@/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Textarea } from "@/components/ui/textarea"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { FileUpload } from "@/components/ui/file-upload"
 import {
   Table,
   TableBody,
@@ -73,6 +81,10 @@ import {
   RefreshCw,
   UserCog,
   Mail,
+  ExternalLink,
+  ImageIcon,
+  Building2,
+  Loader2,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -115,58 +127,6 @@ function getStaffAvatarColor(id: string): string {
   return staffAvatarColors[Math.abs(hash) % staffAvatarColors.length]
 }
 
-// --- Mock data types ---
-
-interface WorkerDetailData {
-  id: string
-  name: string
-  phone: string
-  zalo: string
-  dateOfBirth: string
-  gender: string
-  cccd: string
-  address: string
-  area: string
-  skills: string[]
-  notes: string
-  status: "available" | "working" | "inactive" | "blacklist"
-  rating: number
-  totalShifts: number
-  totalOrders: number
-  completionRate: number
-  joinDate: string
-  currentAssignment: {
-    client: string
-    position: string
-    startDate: string
-    endDate: string
-  } | null
-  finance: {
-    monthSalary: number
-    paid: number
-    remaining: number
-  }
-}
-
-interface WorkHistory {
-  id: string
-  orderCode: string
-  client: string
-  position: string
-  period: string
-  workDays: number
-  rating: number
-  note: string
-}
-
-interface AttendanceRecord {
-  date: string
-  checkIn: string
-  checkOut: string
-  hours: number
-  status: "on_time" | "late" | "absent"
-}
-
 // --- Config ---
 
 const statusConfig = {
@@ -202,112 +162,6 @@ const attendanceStatusConfig = {
   absent: { label: "Vắng", className: "bg-red-50 text-red-700 border-red-200" },
 }
 
-// --- Mock data ---
-
-const mockWorkerDetail: WorkerDetailData = {
-  id: "w2",
-  name: "Trần Thị Mai",
-  phone: "0912345678",
-  zalo: "0912345678",
-  dateOfBirth: "15/03/1998",
-  gender: "Nữ",
-  cccd: "079301002345",
-  address: "123 Nguyễn Văn Cừ, P.4, Q.5, TP.HCM",
-  area: "Thủ Đức",
-  skills: ["Phục vụ", "Đóng gói", "Bốc xếp"],
-  notes: "Làm việc chăm chỉ, hay đến sớm. Ưu tiên ca sáng.",
-  status: "working",
-  rating: 4.2,
-  totalShifts: 89,
-  totalOrders: 15,
-  completionRate: 92,
-  joinDate: "12/01/2024",
-  currentAssignment: {
-    client: "Công ty TNHH ABC Food",
-    position: "Phục vụ tiệc",
-    startDate: "01/04/2026",
-    endDate: "15/04/2026",
-  },
-  finance: {
-    monthSalary: 5400000,
-    paid: 3600000,
-    remaining: 1800000,
-  },
-}
-
-const mockWorkHistory: WorkHistory[] = [
-  {
-    id: "wh1",
-    orderCode: "DH-2026-042",
-    client: "Công ty TNHH ABC Food",
-    position: "Phục vụ tiệc",
-    period: "01/04 - 15/04/2026",
-    workDays: 12,
-    rating: 4.5,
-    note: "Làm việc tốt",
-  },
-  {
-    id: "wh2",
-    orderCode: "DH-2026-035",
-    client: "Nhà hàng Hải Sản Biển Đông",
-    position: "Phục vụ",
-    period: "15/03 - 28/03/2026",
-    workDays: 10,
-    rating: 4.0,
-    note: "Hoàn thành nhiệm vụ",
-  },
-  {
-    id: "wh3",
-    orderCode: "DH-2026-028",
-    client: "Siêu thị BigC Tân Phú",
-    position: "Đóng gói hàng hóa",
-    period: "01/03 - 10/03/2026",
-    workDays: 8,
-    rating: 4.8,
-    note: "Xuất sắc, KH khen",
-  },
-  {
-    id: "wh4",
-    orderCode: "DH-2026-019",
-    client: "Kho Vận Chuyển Express",
-    position: "Bốc xếp",
-    period: "10/02 - 20/02/2026",
-    workDays: 9,
-    rating: 3.5,
-    note: "Đến trễ 2 lần",
-  },
-  {
-    id: "wh5",
-    orderCode: "DH-2026-012",
-    client: "Công ty Tổ Chức Sự Kiện StarLight",
-    position: "Phục vụ sự kiện",
-    period: "25/01 - 30/01/2026",
-    workDays: 5,
-    rating: 4.2,
-    note: "",
-  },
-  {
-    id: "wh6",
-    orderCode: "DH-2025-098",
-    client: "Nhà máy Samsung HCMC",
-    position: "Đóng gói",
-    period: "01/12 - 25/12/2025",
-    workDays: 20,
-    rating: 4.6,
-    note: "Worker tốt, dễ làm việc",
-  },
-]
-
-const mockAttendance: AttendanceRecord[] = [
-  { date: "07/04/2026", checkIn: "07:55", checkOut: "17:05", hours: 8, status: "on_time" },
-  { date: "06/04/2026", checkIn: "07:50", checkOut: "17:10", hours: 8, status: "on_time" },
-  { date: "05/04/2026", checkIn: "08:15", checkOut: "17:00", hours: 8, status: "late" },
-  { date: "04/04/2026", checkIn: "07:58", checkOut: "17:02", hours: 8, status: "on_time" },
-  { date: "03/04/2026", checkIn: "—", checkOut: "—", hours: 0, status: "absent" },
-  { date: "02/04/2026", checkIn: "07:45", checkOut: "17:00", hours: 8, status: "on_time" },
-  { date: "01/04/2026", checkIn: "07:52", checkOut: "17:08", hours: 8, status: "on_time" },
-]
-
 // --- Helpers ---
 
 const avatarColors = [
@@ -333,10 +187,6 @@ function getInitials(name: string): string {
     .slice(-2)
     .join("")
     .toUpperCase()
-}
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("vi-VN").format(amount) + "đ"
 }
 
 function renderStars(rating: number) {
@@ -605,23 +455,471 @@ function ChangeStaffDialog({
   )
 }
 
+// --- Edit Worker Dialog ---
+
+function EditWorkerDialog({
+  open,
+  onOpenChange,
+  worker,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  worker: WorkerNew
+}) {
+  const updateMutation = useUpdateWorkerNew()
+
+  const [formData, setFormData] = useState({
+    full_name: "",
+    date_of_birth: "",
+    gender: "male" as "male" | "female",
+    id_number: "",
+    id_issued_date: "",
+    id_issued_place: "",
+    id_card_front_url: "",
+    id_card_back_url: "",
+    avatar_url: "",
+    phone: "",
+    email: "",
+    zalo: "",
+    facebook_url: "",
+    address: "",
+    district: "",
+    city: "",
+    experience_notes: "",
+    bank_name: "",
+    bank_account: "",
+    bank_account_name: "",
+    emergency_contact_name: "",
+    emergency_contact_phone: "",
+    notes: "",
+  })
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Reset form data when worker changes or dialog opens
+  useEffect(() => {
+    if (open && worker) {
+      setFormData({
+        full_name: worker.full_name ?? "",
+        date_of_birth: worker.date_of_birth ?? "",
+        gender: (worker.gender as "male" | "female") ?? "male",
+        id_number: worker.id_number ?? "",
+        id_issued_date: worker.id_issued_date ?? "",
+        id_issued_place: worker.id_issued_place ?? "",
+        id_card_front_url: worker.id_card_front_url ?? "",
+        id_card_back_url: worker.id_card_back_url ?? "",
+        avatar_url: worker.avatar_url ?? "",
+        phone: worker.phone ?? "",
+        email: worker.email ?? "",
+        zalo: worker.zalo ?? "",
+        facebook_url: worker.facebook_url ?? "",
+        address: worker.address ?? "",
+        district: worker.district ?? "",
+        city: worker.city ?? "",
+        experience_notes: worker.experience_notes ?? "",
+        bank_name: worker.bank_name ?? "",
+        bank_account: worker.bank_account ?? "",
+        bank_account_name: worker.bank_account_name ?? "",
+        emergency_contact_name: worker.emergency_contact_name ?? "",
+        emergency_contact_phone: worker.emergency_contact_phone ?? "",
+        notes: worker.notes ?? "",
+      })
+      setErrors({})
+    }
+  }, [open, worker])
+
+  function validate(): boolean {
+    const errs: Record<string, string> = {}
+    if (!formData.full_name.trim()) errs.full_name = "Vui lòng nhập họ tên"
+    if (!formData.phone.trim()) errs.phone = "Vui lòng nhập số điện thoại"
+    setErrors(errs)
+    return Object.keys(errs).length === 0
+  }
+
+  function handleSave() {
+    if (!validate()) return
+
+    const data: UpdateWorkerNewDto = {
+      full_name: formData.full_name,
+      date_of_birth: formData.date_of_birth || undefined,
+      gender: formData.gender || undefined,
+      id_number: formData.id_number || undefined,
+      id_issued_date: formData.id_issued_date || undefined,
+      id_issued_place: formData.id_issued_place || undefined,
+      id_card_front_url: formData.id_card_front_url || undefined,
+      id_card_back_url: formData.id_card_back_url || undefined,
+      avatar_url: formData.avatar_url || undefined,
+      phone: formData.phone || undefined,
+      email: formData.email || undefined,
+      zalo: formData.zalo || undefined,
+      facebook_url: formData.facebook_url || undefined,
+      address: formData.address || undefined,
+      district: formData.district || undefined,
+      city: formData.city || undefined,
+      experience_notes: formData.experience_notes || undefined,
+      bank_name: formData.bank_name || undefined,
+      bank_account: formData.bank_account || undefined,
+      bank_account_name: formData.bank_account_name || undefined,
+      emergency_contact_name: formData.emergency_contact_name || undefined,
+      emergency_contact_phone: formData.emergency_contact_phone || undefined,
+      notes: formData.notes || undefined,
+    }
+
+    updateMutation.mutate(
+      { id: worker.id, data },
+      {
+        onSuccess: () => {
+          onOpenChange(false)
+        },
+      },
+    )
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Chỉnh sửa ứng viên</DialogTitle>
+          <DialogDescription>
+            Cập nhật thông tin ứng viên <strong>{worker.full_name}</strong>.
+          </DialogDescription>
+        </DialogHeader>
+
+        <ScrollArea className="flex-1 overflow-y-auto -mx-4 px-4">
+          <div className="space-y-6 py-2">
+            {/* Section: Thong tin ca nhan */}
+            <div>
+              <h4 className="text-sm font-semibold text-foreground mb-3">Thông tin cá nhân</h4>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Ảnh đại diện</Label>
+                  <FileUpload
+                    value={formData.avatar_url}
+                    onChange={(url) => setFormData((p) => ({ ...p, avatar_url: url ?? "" }))}
+                    folder="avatars"
+                    placeholder="Chọn ảnh đại diện"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-full-name">Họ tên <span className="text-destructive">*</span></Label>
+                  <Input
+                    id="edit-full-name"
+                    value={formData.full_name}
+                    onChange={(e) => setFormData((p) => ({ ...p, full_name: e.target.value }))}
+                    placeholder="Nguyễn Văn A"
+                  />
+                  {errors.full_name && <p className="text-xs text-destructive">{errors.full_name}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-dob">Ngày sinh</Label>
+                  <Input
+                    id="edit-dob"
+                    type="date"
+                    value={formData.date_of_birth}
+                    onChange={(e) => setFormData((p) => ({ ...p, date_of_birth: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Giới tính</Label>
+                  <RadioGroup
+                    value={formData.gender}
+                    onValueChange={(val) => setFormData((p) => ({ ...p, gender: val as "male" | "female" }))}
+                    className="flex gap-4 pt-1"
+                  >
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="male" />
+                      <Label className="font-normal cursor-pointer">Nam</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="female" />
+                      <Label className="font-normal cursor-pointer">Nữ</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-id-number">CCCD</Label>
+                  <Input
+                    id="edit-id-number"
+                    value={formData.id_number}
+                    onChange={(e) => setFormData((p) => ({ ...p, id_number: e.target.value }))}
+                    placeholder="079xxxxxxxxx"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-id-issued-date">Ngày cấp</Label>
+                  <Input
+                    id="edit-id-issued-date"
+                    value={formData.id_issued_date}
+                    onChange={(e) => setFormData((p) => ({ ...p, id_issued_date: e.target.value }))}
+                    placeholder="dd/mm/yyyy"
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="edit-id-issued-place">Nơi cấp</Label>
+                  <Input
+                    id="edit-id-issued-place"
+                    value={formData.id_issued_place}
+                    onChange={(e) => setFormData((p) => ({ ...p, id_issued_place: e.target.value }))}
+                    placeholder="Cục CS QLHC về TTXH"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Ảnh mặt trước CCCD</Label>
+                  <FileUpload
+                    value={formData.id_card_front_url}
+                    onChange={(url) => setFormData((p) => ({ ...p, id_card_front_url: url ?? "" }))}
+                    folder="id-cards"
+                    placeholder="Chọn ảnh mặt trước"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Ảnh mặt sau CCCD</Label>
+                  <FileUpload
+                    value={formData.id_card_back_url}
+                    onChange={(url) => setFormData((p) => ({ ...p, id_card_back_url: url ?? "" }))}
+                    folder="id-cards"
+                    placeholder="Chọn ảnh mặt sau"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-phone">SĐT <span className="text-destructive">*</span></Label>
+                  <Input
+                    id="edit-phone"
+                    value={formData.phone}
+                    onChange={(e) => setFormData((p) => ({ ...p, phone: e.target.value }))}
+                    placeholder="09xxxxxxxx"
+                  />
+                  {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-email">Email</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
+                    placeholder="email@example.com"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-zalo">Zalo</Label>
+                  <Input
+                    id="edit-zalo"
+                    value={formData.zalo}
+                    onChange={(e) => setFormData((p) => ({ ...p, zalo: e.target.value }))}
+                    placeholder="Số Zalo"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-facebook">Facebook</Label>
+                  <Input
+                    id="edit-facebook"
+                    value={formData.facebook_url}
+                    onChange={(e) => setFormData((p) => ({ ...p, facebook_url: e.target.value }))}
+                    placeholder="https://facebook.com/..."
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Section: Dia chi */}
+            <div>
+              <h4 className="text-sm font-semibold text-foreground mb-3">Địa chỉ</h4>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="edit-address">Địa chỉ</Label>
+                  <Input
+                    id="edit-address"
+                    value={formData.address}
+                    onChange={(e) => setFormData((p) => ({ ...p, address: e.target.value }))}
+                    placeholder="Số nhà, đường, phường..."
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-district">Quận/Huyện</Label>
+                  <Input
+                    id="edit-district"
+                    value={formData.district}
+                    onChange={(e) => setFormData((p) => ({ ...p, district: e.target.value }))}
+                    placeholder="Quận/Huyện"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-city">Tỉnh/Thành phố</Label>
+                  <Input
+                    id="edit-city"
+                    value={formData.city}
+                    onChange={(e) => setFormData((p) => ({ ...p, city: e.target.value }))}
+                    placeholder="TP.HCM"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Section: Kinh nghiem */}
+            <div>
+              <h4 className="text-sm font-semibold text-foreground mb-3">Kinh nghiệm & Ghi chú</h4>
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-experience">Kinh nghiệm</Label>
+                  <Textarea
+                    id="edit-experience"
+                    value={formData.experience_notes}
+                    onChange={(e) => setFormData((p) => ({ ...p, experience_notes: e.target.value }))}
+                    placeholder="Mô tả kinh nghiệm làm việc..."
+                    className="min-h-20"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-notes">Ghi chú</Label>
+                  <Textarea
+                    id="edit-notes"
+                    value={formData.notes}
+                    onChange={(e) => setFormData((p) => ({ ...p, notes: e.target.value }))}
+                    placeholder="Ghi chú thêm..."
+                    className="min-h-16"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Section: Ngan hang */}
+            <div>
+              <h4 className="text-sm font-semibold text-foreground mb-3">Thông tin ngân hàng</h4>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-bank-name">Tên ngân hàng</Label>
+                  <Input
+                    id="edit-bank-name"
+                    value={formData.bank_name}
+                    onChange={(e) => setFormData((p) => ({ ...p, bank_name: e.target.value }))}
+                    placeholder="Vietcombank"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-bank-account">Số tài khoản</Label>
+                  <Input
+                    id="edit-bank-account"
+                    value={formData.bank_account}
+                    onChange={(e) => setFormData((p) => ({ ...p, bank_account: e.target.value }))}
+                    placeholder="0123456789"
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="edit-bank-account-name">Chủ tài khoản</Label>
+                  <Input
+                    id="edit-bank-account-name"
+                    value={formData.bank_account_name}
+                    onChange={(e) => setFormData((p) => ({ ...p, bank_account_name: e.target.value }))}
+                    placeholder="NGUYEN VAN A"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Section: Lien he khan cap */}
+            <div>
+              <h4 className="text-sm font-semibold text-foreground mb-3">Liên hệ khẩn cấp</h4>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-emergency-name">Họ tên</Label>
+                  <Input
+                    id="edit-emergency-name"
+                    value={formData.emergency_contact_name}
+                    onChange={(e) => setFormData((p) => ({ ...p, emergency_contact_name: e.target.value }))}
+                    placeholder="Người liên hệ"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-emergency-phone">SĐT</Label>
+                  <Input
+                    id="edit-emergency-phone"
+                    value={formData.emergency_contact_phone}
+                    onChange={(e) => setFormData((p) => ({ ...p, emergency_contact_phone: e.target.value }))}
+                    placeholder="09xxxxxxxx"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </ScrollArea>
+
+        <DialogFooter>
+          <DialogClose render={<Button variant="outline" />}>Hủy</DialogClose>
+          <Button onClick={handleSave} disabled={updateMutation.isPending} className="gap-1.5">
+            {updateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Cập nhật
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export function WorkerDetail() {
   const { id } = useParams<{ id: string }>()
+  const can = usePermissions()
+  const navigate = useNavigate()
   const [createAccountOpen, setCreateAccountOpen] = useState(false)
   const [changeStaffOpen, setChangeStaffOpen] = useState(false)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [assignedStaffId, setAssignedStaffId] = useState<string | null>("s2")
 
-  // In production, fetch by id. For now, use mock data.
-  const worker = mockWorkerDetail
-  const config = statusConfig[worker.status]
-  const navigate = useNavigate()
-  const hasAccount = worker.id === "w1" || worker.id === "w2" // Workers with email accounts
+  // API calls
+  const { data: apiWorker, isLoading, isError } = useWorkerNew(id)
+  const { data: evaluation } = useWorkerEvaluation(id)
 
-  // Totals from work history
-  const totalWorkDays = mockWorkHistory.reduce((sum, wh) => sum + wh.workDays, 0)
-  const totalOrders = mockWorkHistory.length
+  // Derived values from API data
+  const workerStatus = apiWorker
+    ? (apiWorker.status === "assigned" ? "working" : apiWorker.status === "blacklisted" ? "blacklist" : apiWorker.status) as "available" | "working" | "inactive" | "blacklist"
+    : "available"
+  const config = apiWorker ? statusConfig[workerStatus] : statusConfig.available
+  const hasAccount = apiWorker ? !!apiWorker.user_id : false
+  const workerName = apiWorker?.full_name ?? ""
+  const workerSkills = apiWorker?.skills?.map((s) => s.skill_name) ?? []
+  const workerArea = apiWorker ? [apiWorker.district, apiWorker.city].filter(Boolean).join(", ") : ""
+  const workerRating = Number(apiWorker?.average_rating) || 0
+  const totalWorkDays = apiWorker?.total_days_worked ?? 0
+  const totalOrders = apiWorker?.total_orders ?? 0
+  const completionRate = totalOrders > 0 ? Math.round(((totalOrders - (apiWorker?.no_show_count ?? 0)) / totalOrders) * 100) : 0
+  const joinDate = apiWorker?.created_at ? new Date(apiWorker.created_at).toLocaleDateString("vi-VN") : ""
 
-  void id // suppress unused warning
+  // Work history & attendance from evaluation API
+  const workHistory: WorkerWorkHistoryItem[] = evaluation?.work_history ?? []
+  const recentAttendance: WorkerAttendanceItem[] = evaluation?.recent_attendance ?? []
+
+  // Find current active assignment
+  const currentAssignment = apiWorker?.assignments?.find((a) => a.status === "working" || a.status === "confirmed")
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (isError || !apiWorker) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <XCircle className="h-12 w-12 text-muted-foreground/40 mb-4" />
+        <h2 className="text-lg font-semibold mb-1">Không tìm thấy ứng viên</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Ứng viên không tồn tại hoặc đã bị xóa.
+        </p>
+        <Button variant="outline" onClick={() => navigate("/workers")}>
+          Quay lại danh sách
+        </Button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -639,7 +937,7 @@ export function WorkerDetail() {
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbPage>{worker.name}</BreadcrumbPage>
+            <BreadcrumbPage>{workerName}</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
@@ -648,16 +946,19 @@ export function WorkerDetail() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <Avatar className="h-16 w-16 shadow-lg">
+            {apiWorker.avatar_url && (
+              <AvatarImage src={apiWorker.avatar_url} alt={workerName} />
+            )}
             <AvatarFallback
-              className={`bg-gradient-to-br ${getAvatarColor(worker.id)} text-lg font-bold text-white`}
+              className={`bg-gradient-to-br ${getAvatarColor(apiWorker.id)} text-lg font-bold text-white`}
             >
-              {getInitials(worker.name)}
+              {getInitials(workerName)}
             </AvatarFallback>
           </Avatar>
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold tracking-tight">
-                {worker.name}
+                {workerName}
               </h1>
               <Badge
                 variant="outline"
@@ -670,32 +971,36 @@ export function WorkerDetail() {
               </Badge>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              Mã ứng viên: {worker.id} &middot; Tham gia từ {worker.joinDate}
+              Mã: {apiWorker.worker_code} &middot; Tham gia từ {joinDate}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="gap-1.5" onClick={() => toast.info("Tính năng đang phát triển")}>
-            <Pencil className="h-4 w-4" />
-            Sửa
-          </Button>
-          {!hasAccount && (
+          {can("workers.update") && (
+            <Button variant="outline" className="gap-1.5" onClick={() => setEditDialogOpen(true)}>
+              <Pencil className="h-4 w-4" />
+              Sửa
+            </Button>
+          )}
+          {can("workers.update") && !hasAccount && (
             <Button variant="outline" className="gap-1.5" onClick={() => setCreateAccountOpen(true)}>
               <UserPlus className="h-4 w-4" />
               Tạo tài khoản
             </Button>
           )}
-          <Button className="gap-1.5" onClick={() => navigate("/dispatch")}>
-            <Send className="h-4 w-4" />
-            Điều phối
-          </Button>
+          {can("assignments.create") && (
+            <Button className="gap-1.5" onClick={() => navigate("/dispatch")}>
+              <Send className="h-4 w-4" />
+              Điều phối
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border hover:bg-muted">
               <MoreHorizontal className="h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuGroup>
-                {!hasAccount && (
+                {can("workers.update") && !hasAccount && (
                   <DropdownMenuItem onClick={() => setCreateAccountOpen(true)}>
                     <UserPlus className="mr-2 h-4 w-4" />
                     Tạo tài khoản
@@ -703,7 +1008,7 @@ export function WorkerDetail() {
                 )}
                 <DropdownMenuItem onClick={() => {
                   toast.loading("Đang xuất hồ sơ...", { id: "export-profile" })
-                  setTimeout(() => toast.success(`Đã xuất hồ sơ ${worker.name} thành công`, { id: "export-profile" }), 1000)
+                  setTimeout(() => toast.success(`Đã xuất hồ sơ ${workerName} thành công`, { id: "export-profile" }), 1000)
                 }}>
                   <FileText className="mr-2 h-4 w-4" />
                   Xuất hồ sơ
@@ -712,10 +1017,12 @@ export function WorkerDetail() {
                   <Bell className="mr-2 h-4 w-4" />
                   Gửi thông báo
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => toast.success("Đã tạm khóa ứng viên")}>
-                  <Lock className="mr-2 h-4 w-4" />
-                  Tạm khóa
-                </DropdownMenuItem>
+                {can("workers.change_status") && (
+                  <DropdownMenuItem onClick={() => toast.success("Đã tạm khóa ứng viên")}>
+                    <Lock className="mr-2 h-4 w-4" />
+                    Tạm khóa
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -736,26 +1043,102 @@ export function WorkerDetail() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-x-6 sm:grid-cols-2">
-                <InfoRow icon={User} label="Họ tên" value={worker.name} />
+                <InfoRow icon={User} label="Họ tên" value={workerName} />
                 <InfoRow
                   icon={CalendarDays}
                   label="Ngày sinh"
-                  value={worker.dateOfBirth}
+                  value={apiWorker.date_of_birth ?? ""}
                 />
-                <InfoRow icon={User} label="Giới tính" value={worker.gender} />
+                <InfoRow icon={User} label="Giới tính" value={apiWorker.gender_label ?? ""} />
                 <InfoRow
                   icon={CreditCard}
                   label="CCCD/CMND"
-                  value={worker.cccd}
+                  value={apiWorker.id_number ?? ""}
                 />
-                <InfoRow icon={Phone} label="SĐT" value={worker.phone} />
-                <InfoRow icon={Phone} label="Zalo" value={worker.zalo} />
+                <InfoRow
+                  icon={CalendarDays}
+                  label="Ngày cấp"
+                  value={apiWorker.id_issued_date ?? ""}
+                />
+                <InfoRow
+                  icon={Building2}
+                  label="Nơi cấp"
+                  value={apiWorker.id_issued_place ?? ""}
+                />
+                <InfoRow icon={Phone} label="SĐT" value={apiWorker.phone ?? ""} />
+                <InfoRow icon={Phone} label="Zalo" value={apiWorker.zalo ?? ""} />
+                <InfoRow
+                  icon={ExternalLink}
+                  label="Facebook"
+                  value={
+                    apiWorker.facebook_url ? (
+                      <a
+                        href={apiWorker.facebook_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-primary hover:underline"
+                      >
+                        {apiWorker.facebook_url.replace(/^https?:\/\/(www\.)?/, "")}
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    ) : (
+                      ""
+                    )
+                  }
+                />
                 <InfoRow
                   icon={MapPin}
                   label="Địa chỉ"
-                  value={worker.address}
+                  value={apiWorker.address ?? ""}
                 />
-                <InfoRow icon={MapPin} label="Khu vực" value={worker.area} />
+                <InfoRow icon={MapPin} label="Khu vực" value={workerArea} />
+              </div>
+
+              {/* CCCD Photos */}
+              <Separator className="my-4" />
+              <div>
+                <p className="mb-3 text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <ImageIcon className="h-3.5 w-3.5" />
+                  Ảnh CCCD
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="mb-1.5 text-[11px] text-muted-foreground">
+                      Mặt trước
+                    </p>
+                    {apiWorker.id_card_front_url ? (
+                      <img
+                        src={apiWorker.id_card_front_url}
+                        alt="CCCD mặt trước"
+                        className="w-full rounded-lg border object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-32 items-center justify-center rounded-lg border border-dashed bg-muted/30">
+                        <p className="text-xs text-muted-foreground">
+                          Chưa có ảnh
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <p className="mb-1.5 text-[11px] text-muted-foreground">
+                      Mặt sau
+                    </p>
+                    {apiWorker.id_card_back_url ? (
+                      <img
+                        src={apiWorker.id_card_back_url}
+                        alt="CCCD mặt sau"
+                        className="w-full rounded-lg border object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-32 items-center justify-center rounded-lg border border-dashed bg-muted/30">
+                        <p className="text-xs text-muted-foreground">
+                          Chưa có ảnh
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <Separator className="my-4" />
@@ -766,7 +1149,7 @@ export function WorkerDetail() {
                   Kỹ năng
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {worker.skills.map((skill) => (
+                  {workerSkills.length > 0 ? workerSkills.map((skill) => (
                     <Badge
                       key={skill}
                       variant="secondary"
@@ -774,11 +1157,13 @@ export function WorkerDetail() {
                     >
                       {skill}
                     </Badge>
-                  ))}
+                  )) : (
+                    <p className="text-sm text-muted-foreground">Chưa có kỹ năng</p>
+                  )}
                 </div>
               </div>
 
-              {worker.notes && (
+              {apiWorker.notes && (
                 <>
                   <Separator className="my-4" />
                   <div>
@@ -786,7 +1171,7 @@ export function WorkerDetail() {
                       Ghi chú đặc biệt
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {worker.notes}
+                      {apiWorker.notes}
                     </p>
                   </div>
                 </>
@@ -806,37 +1191,46 @@ export function WorkerDetail() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Yêu cầu TD</TableHead>
+                    <TableHead>Mã đơn hàng</TableHead>
                     <TableHead>Khách hàng</TableHead>
                     <TableHead>Vị trí</TableHead>
                     <TableHead>Thời gian</TableHead>
                     <TableHead className="text-center">Ngày công</TableHead>
                     <TableHead>Đánh giá</TableHead>
-                    <TableHead>Ghi chú</TableHead>
+                    <TableHead>Trạng thái</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockWorkHistory.map((wh) => (
+                  {workHistory.length > 0 ? workHistory.map((wh) => (
                     <TableRow key={wh.id}>
                       <TableCell className="text-xs font-mono text-primary">
-                        {wh.orderCode}
+                        {wh.order_code ?? "—"}
                       </TableCell>
                       <TableCell className="text-sm max-w-[180px] truncate">
-                        {wh.client}
+                        {wh.client ?? "—"}
                       </TableCell>
-                      <TableCell className="text-sm">{wh.position}</TableCell>
+                      <TableCell className="text-sm">{wh.position ?? "—"}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {wh.period}
+                        {wh.started_at ? new Date(wh.started_at).toLocaleDateString("vi-VN") : "—"}
+                        {wh.completed_at ? ` - ${new Date(wh.completed_at).toLocaleDateString("vi-VN")}` : ""}
                       </TableCell>
                       <TableCell className="text-center text-sm font-medium">
-                        {wh.workDays}
+                        {wh.present_days}/{wh.total_days}
                       </TableCell>
-                      <TableCell>{renderMiniStars(wh.rating)}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground max-w-[140px] truncate">
-                        {wh.note || "—"}
+                      <TableCell>{renderMiniStars(wh.evaluation?.overall ?? 0)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-[11px]">
+                          {wh.status_label}
+                        </Badge>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
+                        Chưa có lịch sử làm việc
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
               <div className="border-t bg-muted/30 px-4 py-3">
@@ -874,21 +1268,24 @@ export function WorkerDetail() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockAttendance.map((record) => {
-                    const attConfig = attendanceStatusConfig[record.status]
+                  {recentAttendance.length > 0 ? recentAttendance.map((record) => {
+                    const attConfig = attendanceStatusConfig[record.status as keyof typeof attendanceStatusConfig] ?? {
+                      label: record.status_label,
+                      className: "bg-gray-50 text-gray-600 border-gray-200",
+                    }
                     return (
-                      <TableRow key={record.date}>
+                      <TableRow key={record.id}>
                         <TableCell className="text-sm font-medium">
-                          {record.date}
+                          {new Date(record.date).toLocaleDateString("vi-VN")}
                         </TableCell>
                         <TableCell className="text-sm">
-                          {record.checkIn}
+                          {record.check_in ?? "—"}
                         </TableCell>
                         <TableCell className="text-sm">
-                          {record.checkOut}
+                          {record.check_out ?? "—"}
                         </TableCell>
                         <TableCell className="text-center text-sm">
-                          {record.hours > 0 ? `${record.hours}h` : "—"}
+                          {record.hours != null && record.hours > 0 ? `${record.hours}h` : "—"}
                         </TableCell>
                         <TableCell>
                           <Badge
@@ -909,7 +1306,13 @@ export function WorkerDetail() {
                         </TableCell>
                       </TableRow>
                     )
-                  })}
+                  }) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">
+                        Chưa có dữ liệu chấm công
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -944,9 +1347,9 @@ export function WorkerDetail() {
                   Đánh giá trung bình
                 </span>
                 <div className="flex items-center gap-2">
-                  {renderStars(worker.rating)}
+                  {renderStars(workerRating)}
                   <span className="text-sm font-bold">
-                    {worker.rating.toFixed(1)}/5
+                    {workerRating.toFixed(1)}/5
                   </span>
                 </div>
               </div>
@@ -956,7 +1359,7 @@ export function WorkerDetail() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg border border-border/50 bg-muted/30 p-3 text-center">
                   <p className="text-xl font-bold text-foreground">
-                    {worker.totalShifts}
+                    {totalWorkDays}
                   </p>
                   <p className="mt-0.5 text-[11px] text-muted-foreground">
                     Tổng ngày công
@@ -964,7 +1367,7 @@ export function WorkerDetail() {
                 </div>
                 <div className="rounded-lg border border-border/50 bg-muted/30 p-3 text-center">
                   <p className="text-xl font-bold text-foreground">
-                    {worker.totalOrders}
+                    {totalOrders}
                   </p>
                   <p className="mt-0.5 text-[11px] text-muted-foreground">
                     Tổng YCTD
@@ -972,7 +1375,7 @@ export function WorkerDetail() {
                 </div>
                 <div className="rounded-lg border border-border/50 bg-muted/30 p-3 text-center">
                   <p className="text-xl font-bold text-emerald-600">
-                    {worker.completionRate}%
+                    {completionRate}%
                   </p>
                   <p className="mt-0.5 text-[11px] text-muted-foreground">
                     Tỷ lệ hoàn thành
@@ -980,7 +1383,7 @@ export function WorkerDetail() {
                 </div>
                 <div className="rounded-lg border border-border/50 bg-muted/30 p-3 text-center">
                   <p className="text-sm font-bold text-foreground">
-                    {worker.joinDate}
+                    {joinDate}
                   </p>
                   <p className="mt-0.5 text-[11px] text-muted-foreground">
                     Ngày tham gia pool
@@ -1010,10 +1413,12 @@ export function WorkerDetail() {
                       <p className="text-sm text-muted-foreground mb-3">
                         Chưa phân công người phụ trách
                       </p>
-                      <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setChangeStaffOpen(true)}>
-                        <UserCog className="h-3.5 w-3.5" />
-                        Phân công
-                      </Button>
+                      {can("workers.assign_staff") && (
+                        <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setChangeStaffOpen(true)}>
+                          <UserCog className="h-3.5 w-3.5" />
+                          Phân công
+                        </Button>
+                      )}
                     </div>
                   )
                 }
@@ -1044,15 +1449,17 @@ export function WorkerDetail() {
                         <span className="truncate">{staff.email}</span>
                       </div>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full gap-1.5"
-                      onClick={() => setChangeStaffOpen(true)}
-                    >
-                      <RefreshCw className="h-3.5 w-3.5" />
-                      Đổi người phụ trách
-                    </Button>
+                    {can("workers.assign_staff") && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full gap-1.5"
+                        onClick={() => setChangeStaffOpen(true)}
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        Đổi người phụ trách
+                      </Button>
+                    )}
                   </div>
                 )
               })()}
@@ -1068,25 +1475,25 @@ export function WorkerDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {worker.currentAssignment ? (
+              {currentAssignment ? (
                 <div className="space-y-3">
                   <div>
-                    <p className="text-xs text-muted-foreground">Khách hàng</p>
+                    <p className="text-xs text-muted-foreground">Đơn hàng</p>
                     <p className="text-sm font-semibold">
-                      {worker.currentAssignment.client}
+                      {currentAssignment.order?.order_code ?? "—"}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Vị trí</p>
                     <p className="text-sm font-medium">
-                      {worker.currentAssignment.position}
+                      {currentAssignment.order?.position_name ?? "—"}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Thời gian</p>
                     <p className="text-sm">
-                      {worker.currentAssignment.startDate} &mdash;{" "}
-                      {worker.currentAssignment.endDate}
+                      {currentAssignment.started_at ? new Date(currentAssignment.started_at).toLocaleDateString("vi-VN") : "—"}
+                      {currentAssignment.completed_at ? ` — ${new Date(currentAssignment.completed_at).toLocaleDateString("vi-VN")}` : ""}
                     </p>
                   </div>
                 </div>
@@ -1114,44 +1521,24 @@ export function WorkerDetail() {
                 <span className="text-sm text-muted-foreground">
                   Lương tháng này
                 </span>
-                <span className="text-sm font-bold">
-                  {formatCurrency(worker.finance.monthSalary)}
-                </span>
+                <span className="text-sm font-bold">—</span>
               </div>
               <Separator />
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">
                   Đã thanh toán
                 </span>
-                <span className="text-sm font-semibold text-emerald-600">
-                  {formatCurrency(worker.finance.paid)}
-                </span>
+                <span className="text-sm font-semibold text-emerald-600">—</span>
               </div>
               <Separator />
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Còn lại</span>
-                <span className="text-sm font-semibold text-amber-600">
-                  {formatCurrency(worker.finance.remaining)}
-                </span>
+                <span className="text-sm font-semibold text-amber-600">—</span>
               </div>
 
-              {/* Progress bar */}
-              <div className="pt-1">
-                <div className="h-2 w-full rounded-full bg-gray-100">
-                  <div
-                    className="h-2 rounded-full bg-emerald-500"
-                    style={{
-                      width: `${(worker.finance.paid / worker.finance.monthSalary) * 100}%`,
-                    }}
-                  />
-                </div>
-                <p className="mt-1 text-[11px] text-muted-foreground text-right">
-                  {Math.round(
-                    (worker.finance.paid / worker.finance.monthSalary) * 100
-                  )}
-                  % đã thanh toán
-                </p>
-              </div>
+              <p className="text-xs text-muted-foreground text-center pt-1">
+                Dữ liệu tài chính sẽ được cập nhật từ module thanh toán
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -1161,7 +1548,7 @@ export function WorkerDetail() {
       <CreateAccountDetailDialog
         open={createAccountOpen}
         onOpenChange={setCreateAccountOpen}
-        workerName={worker.name}
+        workerName={workerName}
       />
 
       {/* Change Staff Dialog */}
@@ -1172,9 +1559,18 @@ export function WorkerDetail() {
         onAssign={(staffId) => {
           setAssignedStaffId(staffId)
           const staff = STAFF_MEMBERS.find((s) => s.id === staffId)
-          toast.success(`Đã phân công ${staff?.name ?? ""} phụ trách ứng viên ${worker.name}`)
+          toast.success(`Đã phân công ${staff?.name ?? ""} phụ trách ứng viên ${workerName}`)
         }}
       />
+
+      {/* Edit Worker Dialog */}
+      {apiWorker && (
+        <EditWorkerDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          worker={apiWorker}
+        />
+      )}
     </div>
   )
 }

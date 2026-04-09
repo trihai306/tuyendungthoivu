@@ -79,10 +79,10 @@ class UpdateStaffingOrderRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'client_id.exists' => 'Khach hang khong ton tai.',
-            'quantity_needed.min' => 'So luong can tuyen phai it nhat la 1.',
-            'end_date.after_or_equal' => 'Ngay ket thuc phai sau hoac bang ngay bat dau.',
-            'age_max.gte' => 'Tuoi toi da phai lon hon hoac bang tuoi toi thieu.',
+            'client_id.exists' => 'Khách hàng không tồn tại.',
+            'quantity_needed.min' => 'Số lượng cần tuyển phải ít nhất là 1.',
+            'end_date.after_or_equal' => 'Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.',
+            'age_max.gte' => 'Tuổi tối đa phải lớn hơn hoặc bằng tuổi tối thiểu.',
         ];
     }
 }

@@ -35,12 +35,12 @@ class CalculatePayrollRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'worker_id.required' => 'Worker la bat buoc.',
-            'worker_id.exists' => 'Worker khong ton tai.',
-            'period_month.required' => 'Thang la bat buoc.',
-            'period_month.between' => 'Thang phai tu 1 den 12.',
-            'period_year.required' => 'Nam la bat buoc.',
-            'period_year.digits' => 'Nam phai co 4 chu so.',
+            'worker_id.required' => 'Worker là bắt buộc.',
+            'worker_id.exists' => 'Worker không tồn tại.',
+            'period_month.required' => 'Tháng là bắt buộc.',
+            'period_month.between' => 'Tháng phải từ 1 đến 12.',
+            'period_year.required' => 'Năm là bắt buộc.',
+            'period_year.digits' => 'Năm phải có 4 chữ số.',
         ];
     }
 }

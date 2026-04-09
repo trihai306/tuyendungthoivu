@@ -32,11 +32,11 @@ class CheckInRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'assignment_id.required' => 'Vui long chon phan cong.',
-            'assignment_id.exists' => 'Phan cong khong ton tai.',
-            'date.required' => 'Ngay lam viec la bat buoc.',
-            'check_in.required' => 'Gio check-in la bat buoc.',
-            'check_in.date_format' => 'Gio check-in phai theo dinh dang HH:mm.',
+            'assignment_id.required' => 'Vui lòng chọn phân công.',
+            'assignment_id.exists' => 'Phân công không tồn tại.',
+            'date.required' => 'Ngày làm việc là bắt buộc.',
+            'check_in.required' => 'Giờ check-in là bắt buộc.',
+            'check_in.date_format' => 'Giờ check-in phải theo định dạng HH:mm.',
         ];
     }
 }

@@ -44,6 +44,9 @@ class DatabaseSeeder extends Seeder
 
             // 12. Staffing system data (clients, contracts, orders, workers, assignments, etc.)
             StaffingSeeder::class,
+
+            // 13. KPI configs + Staff salary configs
+            KpiSeeder::class,
         ]);
     }
 }

@@ -48,10 +48,10 @@ class StoreClientRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'company_name.required' => 'Ten cong ty la bat buoc.',
-            'contact_name.required' => 'Ten nguoi lien he la bat buoc.',
-            'contact_phone.required' => 'So dien thoai lien he la bat buoc.',
-            'tax_code.unique' => 'Ma so thue da ton tai trong he thong.',
+            'company_name.required' => 'Tên công ty là bắt buộc.',
+            'contact_name.required' => 'Tên người liên hệ là bắt buộc.',
+            'contact_phone.required' => 'Số điện thoại liên hệ là bắt buộc.',
+            'tax_code.unique' => 'Mã số thuế đã tồn tại trong hệ thống.',
         ];
     }
 }

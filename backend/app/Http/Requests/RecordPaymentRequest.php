@@ -33,10 +33,10 @@ class RecordPaymentRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'amount.required' => 'So tien la bat buoc.',
-            'amount.min' => 'So tien phai lon hon 0.',
-            'payment_method.required' => 'Phuong thuc thanh toan la bat buoc.',
-            'payment_date.required' => 'Ngay thanh toan la bat buoc.',
+            'amount.required' => 'Số tiền là bắt buộc.',
+            'amount.min' => 'Số tiền phải lớn hơn 0.',
+            'payment_method.required' => 'Phương thức thanh toán là bắt buộc.',
+            'payment_date.required' => 'Ngày thanh toán là bắt buộc.',
         ];
     }
 }

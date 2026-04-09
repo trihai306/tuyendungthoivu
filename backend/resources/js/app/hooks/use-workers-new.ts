@@ -1,9 +1,10 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { createCrudHooks } from "./use-crud";
 import {
   workersNewApi,
   type WorkerNewFilter,
+  type WorkerEvaluation,
 } from "@/services/workers-new.service";
 import type {
   ApiError,
@@ -79,6 +80,16 @@ export function useAssignStaff() {
     onError: (error) => {
       toast.error(error.message ?? "Khong the phan cong.");
     },
+  });
+}
+
+/** Get auto-calculated evaluation for a worker */
+export function useWorkerEvaluation(workerId: string | undefined) {
+  return useQuery<WorkerEvaluation>({
+    queryKey: ["workers-new", workerId, "evaluation"],
+    queryFn: () => workersNewApi.evaluation(workerId!),
+    enabled: !!workerId,
+    staleTime: 60_000,
   });
 }
 

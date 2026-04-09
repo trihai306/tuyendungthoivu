@@ -50,7 +50,7 @@ class InvoiceNewController extends Controller
             ->paginate($perPage);
 
         return InvoiceNewResource::collection($records)
-            ->additional(['message' => 'Danh sach hoa don'])
+            ->additional(['message' => 'Danh sách hóa đơn'])
             ->response();
     }
 
@@ -64,7 +64,7 @@ class InvoiceNewController extends Controller
 
         return response()->json([
             'data' => new InvoiceNewResource($invoice),
-            'message' => 'Chi tiet hoa don.',
+            'message' => 'Chi tiết hóa đơn.',
         ]);
     }
 
@@ -123,7 +123,7 @@ class InvoiceNewController extends Controller
 
         return response()->json([
             'data' => new InvoiceNewResource($invoice),
-            'message' => 'Tao hoa don thanh cong.',
+            'message' => 'Tạo hóa đơn thành công.',
         ], 201);
     }
 
@@ -136,7 +136,7 @@ class InvoiceNewController extends Controller
 
         if (!$invoice->isEditable()) {
             return response()->json([
-                'message' => 'Chi co the sua hoa don o trang thai nhap.',
+                'message' => 'Chỉ có thể sửa hóa đơn ở trạng thái nháp.',
             ], 422);
         }
 
@@ -188,7 +188,7 @@ class InvoiceNewController extends Controller
 
         return response()->json([
             'data' => new InvoiceNewResource($invoice->fresh()),
-            'message' => 'Cap nhat hoa don thanh cong.',
+            'message' => 'Cập nhật hóa đơn thành công.',
         ]);
     }
 
@@ -201,7 +201,7 @@ class InvoiceNewController extends Controller
 
         if (!$invoice->isEditable()) {
             return response()->json([
-                'message' => 'Chi co the xoa hoa don o trang thai nhap.',
+                'message' => 'Chỉ có thể xóa hóa đơn ở trạng thái nháp.',
             ], 422);
         }
 
@@ -209,7 +209,7 @@ class InvoiceNewController extends Controller
         $invoice->delete();
 
         return response()->json([
-            'message' => 'Xoa hoa don thanh cong.',
+            'message' => 'Xóa hóa đơn thành công.',
         ], 204);
     }
 
@@ -222,7 +222,7 @@ class InvoiceNewController extends Controller
 
         if ($invoice->status !== InvoiceStatus::Draft) {
             return response()->json([
-                'message' => 'Chi co the gui hoa don o trang thai nhap.',
+                'message' => 'Chỉ có thể gửi hóa đơn ở trạng thái nháp.',
             ], 422);
         }
 
@@ -235,7 +235,7 @@ class InvoiceNewController extends Controller
 
         return response()->json([
             'data' => new InvoiceNewResource($invoice),
-            'message' => 'Gui hoa don thanh cong.',
+            'message' => 'Gửi hóa đơn thành công.',
         ]);
     }
 
@@ -249,7 +249,7 @@ class InvoiceNewController extends Controller
 
         if (in_array($invoice->status, [InvoiceStatus::Draft, InvoiceStatus::Cancelled])) {
             return response()->json([
-                'message' => 'Khong the ghi nhan thanh toan cho hoa don nay.',
+                'message' => 'Không thể ghi nhận thanh toán cho hóa đơn này.',
             ], 422);
         }
 
@@ -257,7 +257,7 @@ class InvoiceNewController extends Controller
 
         if ($validated['amount'] > $remainingBalance) {
             return response()->json([
-                'message' => sprintf('So tien vuot qua so con lai (%s).', number_format($remainingBalance)),
+                'message' => sprintf('Số tiền vượt quá số còn lại (%s).', number_format($remainingBalance)),
             ], 422);
         }
 
@@ -290,7 +290,7 @@ class InvoiceNewController extends Controller
 
         return response()->json([
             'data' => new InvoiceNewResource($invoice->fresh()),
-            'message' => 'Ghi nhan thanh toan thanh cong.',
+            'message' => 'Ghi nhận thanh toán thành công.',
         ]);
     }
 
@@ -330,7 +330,7 @@ class InvoiceNewController extends Controller
 
         return response()->json([
             'data' => new InvoiceNewResource($newInvoice),
-            'message' => 'Nhan ban hoa don thanh cong.',
+            'message' => 'Nhân bản hóa đơn thành công.',
         ], 201);
     }
 }

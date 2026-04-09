@@ -16,10 +16,7 @@ class Invoice extends Model
 {
     use HasFactory, HasUuids, SoftDeletes;
 
-    /**
-     * Use a separate table to avoid conflict with legacy invoice tables.
-     */
-    protected $table = 'invoices_new';
+    protected $table = 'invoices';
 
     protected $fillable = [
         'invoice_number',

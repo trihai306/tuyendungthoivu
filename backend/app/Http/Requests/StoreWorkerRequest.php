@@ -28,8 +28,15 @@ class StoreWorkerRequest extends FormRequest
             'date_of_birth' => ['required', 'date', 'before:today'],
             'gender' => ['required', 'string', Rule::in(['male', 'female'])],
             'id_number' => ['required', 'string', 'max:20', Rule::unique('workers', 'id_number')],
+            'id_issued_date' => ['nullable', 'string', 'max:20'],
+            'id_issued_place' => ['nullable', 'string', 'max:255'],
+            'id_card_front_url' => ['nullable', 'string', 'max:500'],
+            'id_card_back_url' => ['nullable', 'string', 'max:500'],
             'phone' => ['required', 'string', 'max:15', Rule::unique('workers', 'phone')],
             'email' => ['nullable', 'email', 'max:255'],
+            'zalo' => ['nullable', 'string', 'max:50'],
+            'facebook_url' => ['nullable', 'string', 'max:500'],
+            'avatar_url' => ['nullable', 'string', 'max:500'],
             'address' => ['nullable', 'string', 'max:1000'],
             'district' => ['nullable', 'string', 'max:100'],
             'city' => ['nullable', 'string', 'max:100'],
@@ -56,13 +63,13 @@ class StoreWorkerRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'full_name.required' => 'Ho ten la bat buoc.',
-            'date_of_birth.required' => 'Ngay sinh la bat buoc.',
-            'gender.required' => 'Gioi tinh la bat buoc.',
-            'id_number.required' => 'So CCCD/CMND la bat buoc.',
-            'id_number.unique' => 'So CCCD/CMND da ton tai trong he thong.',
-            'phone.required' => 'So dien thoai la bat buoc.',
-            'phone.unique' => 'So dien thoai da ton tai trong he thong.',
+            'full_name.required' => 'Họ tên là bắt buộc.',
+            'date_of_birth.required' => 'Ngày sinh là bắt buộc.',
+            'gender.required' => 'Giới tính là bắt buộc.',
+            'id_number.required' => 'Số CCCD/CMND là bắt buộc.',
+            'id_number.unique' => 'Số CCCD/CMND đã tồn tại trong hệ thống.',
+            'phone.required' => 'Số điện thoại là bắt buộc.',
+            'phone.unique' => 'Số điện thoại đã tồn tại trong hệ thống.',
         ];
     }
 }

@@ -115,3 +115,4 @@ export * from "./staff";
 export * from "./rbac";
 export * from "./report";
 export * from "./staffing";
+export * from "./kpi";

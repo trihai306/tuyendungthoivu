@@ -8,11 +8,18 @@ use App\Http\Requests\StoreWorkerRequest;
 use App\Http\Requests\UpdateWorkerRequest;
 use App\Http\Resources\WorkerResource2;
 use App\Models\Worker;
+use App\Services\WorkerEvaluationService;
+use App\Traits\ScopesDataByRole;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class WorkerController extends Controller
 {
+    use ScopesDataByRole;
+
+    public function __construct(
+        private readonly WorkerEvaluationService $evaluationService,
+    ) {}
     /**
      * Display a paginated list of workers.
      * Supports filtering by status, skills, area, rating, assigned_staff, and search.
@@ -22,6 +29,12 @@ class WorkerController extends Controller
         $query = Worker::query()
             ->with(['skills'])
             ->withCount('assignments');
+
+        // Role-based data scoping: Recruiters only see their own workers
+        $user = $request->user();
+        if (!$this->isManagerOrAbove($user)) {
+            $query->where('registered_by', $user->id);
+        }
 
         // Search by name, phone, cccd, worker_code
         if ($request->filled('search')) {
@@ -112,7 +125,7 @@ class WorkerController extends Controller
 
         return response()->json([
             'data' => new WorkerResource2($worker),
-            'message' => 'Chi tiet worker',
+            'message' => 'Chi tiết worker',
         ]);
     }
 
@@ -138,7 +151,7 @@ class WorkerController extends Controller
 
         return response()->json([
             'data' => new WorkerResource2($worker->load('skills')),
-            'message' => 'Them worker thanh cong',
+            'message' => 'Thêm worker thành công',
         ], 201);
     }
 
@@ -164,7 +177,7 @@ class WorkerController extends Controller
 
         return response()->json([
             'data' => new WorkerResource2($worker->fresh()->load('skills')),
-            'message' => 'Cap nhat worker thanh cong',
+            'message' => 'Cập nhật worker thành công',
         ]);
     }
 
@@ -180,14 +193,14 @@ class WorkerController extends Controller
 
         if ($activeAssignmentsCount > 0) {
             return response()->json([
-                'message' => 'Khong the xoa worker dang co phan cong hoat dong.',
+                'message' => 'Không thể xóa worker đang có phân công hoạt động.',
             ], 422);
         }
 
         $worker->delete();
 
         return response()->json([
-            'message' => 'Xoa worker thanh cong',
+            'message' => 'Xóa worker thành công',
         ]);
     }
 
@@ -211,8 +224,8 @@ class WorkerController extends Controller
         if ($newStatus === WorkerStatus::Blacklisted) {
             if (!$request->filled('reason')) {
                 return response()->json([
-                    'message' => 'Ly do la bat buoc khi dua worker vao danh sach den.',
-                    'errors' => ['reason' => ['Ly do la bat buoc khi dua worker vao danh sach den.']],
+                    'message' => 'Lý do là bắt buộc khi đưa worker vào danh sách đen.',
+                    'errors' => ['reason' => ['Lý do là bắt buộc khi đưa worker vào danh sách đen.']],
                 ], 422);
             }
             $updateData['blacklist_reason'] = $request->input('reason');
@@ -227,7 +240,7 @@ class WorkerController extends Controller
 
         return response()->json([
             'data' => new WorkerResource2($worker->fresh()),
-            'message' => 'Cap nhat trang thai worker thanh cong',
+            'message' => 'Cập nhật trạng thái worker thành công',
         ]);
     }
 
@@ -248,7 +261,30 @@ class WorkerController extends Controller
 
         return response()->json([
             'data' => new WorkerResource2($worker->fresh()->load('registeredBy')),
-            'message' => 'Gan nguoi phu trach thanh cong',
+            'message' => 'Gán người phụ trách thành công',
+        ]);
+    }
+
+    /**
+     * Get auto-calculated evaluation, work history, and recent attendance for a worker.
+     * All scores are computed from attendance data - no manual input needed.
+     */
+    public function evaluation(string $worker): JsonResponse
+    {
+        $worker = Worker::findOrFail($worker);
+
+        // Sync stats (update denormalized fields)
+        $this->evaluationService->syncWorkerStats($worker);
+
+        return response()->json([
+            'data' => [
+                'worker_id' => $worker->id,
+                'worker_name' => $worker->full_name,
+                'rating' => $this->evaluationService->calculateOverallRating($worker),
+                'work_history' => $this->evaluationService->getWorkHistory($worker),
+                'recent_attendance' => $this->evaluationService->getRecentAttendance($worker),
+            ],
+            'message' => 'Đánh giá tự động worker',
         ]);
     }
 }

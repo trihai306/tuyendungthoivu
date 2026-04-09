@@ -19,6 +19,10 @@ import { StaffList } from "@/pages/staff/StaffList"
 import { StaffDetail } from "@/pages/staff/StaffDetail"
 import { RoleList } from "@/pages/rbac/RoleList"
 import { RoleDetail } from "@/pages/rbac/RoleDetail"
+import { KpiDashboard } from "@/pages/kpi/KpiDashboard"
+import { KpiConfigPage } from "@/pages/kpi/KpiConfigPage"
+import { StaffPayrollList } from "@/pages/staff-payroll/StaffPayrollList"
+import { RevenueDashboard } from "@/pages/revenue/RevenueDashboard"
 import { Login } from "@/pages/Login"
 import { Register } from "@/pages/Register"
 import { ForgotPassword } from "@/pages/ForgotPassword"
@@ -27,6 +31,11 @@ import { ServerError } from "@/pages/errors/ServerError"
 import { Forbidden } from "@/pages/errors/Forbidden"
 import { Maintenance } from "@/pages/errors/Maintenance"
 import { NotificationPage } from "@/pages/notifications/NotificationPage"
+
+// Permission-gated wrapper
+function RequirePermission({ permission, children }: { permission: string; children: React.ReactNode }) {
+  return <ProtectedRoute permission={permission}>{children}</ProtectedRoute>
+}
 
 export const router = createBrowserRouter([
   // Public routes
@@ -45,39 +54,47 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Dashboard /> },
 
-      // Orders (staffing requests from clients)
-      { path: "orders", element: <OrderList /> },
-      { path: "orders/create", element: <OrderCreate /> },
-      { path: "orders/:id", element: <OrderDetail /> },
+      // Orders
+      { path: "orders", element: <RequirePermission permission="orders.view"><OrderList /></RequirePermission> },
+      { path: "orders/create", element: <RequirePermission permission="orders.create"><OrderCreate /></RequirePermission> },
+      { path: "orders/:id", element: <RequirePermission permission="orders.view"><OrderDetail /></RequirePermission> },
 
       // Clients
-      { path: "clients", element: <ClientList /> },
-      { path: "clients/:id", element: <ClientDetail /> },
+      { path: "clients", element: <RequirePermission permission="clients.view"><ClientList /></RequirePermission> },
+      { path: "clients/:id", element: <RequirePermission permission="clients.view"><ClientDetail /></RequirePermission> },
 
       // Workers
-      { path: "workers", element: <WorkerList /> },
-      { path: "workers/:id", element: <WorkerDetail /> },
+      { path: "workers", element: <RequirePermission permission="workers.view"><WorkerList /></RequirePermission> },
+      { path: "workers/:id", element: <RequirePermission permission="workers.view"><WorkerDetail /></RequirePermission> },
 
       // Dispatch
-      { path: "dispatch", element: <DispatchBoard /> },
+      { path: "dispatch", element: <RequirePermission permission="assignments.view"><DispatchBoard /></RequirePermission> },
 
       // Attendance
-      { path: "attendance", element: <AttendanceList /> },
+      { path: "attendance", element: <RequirePermission permission="attendance.view"><AttendanceList /></RequirePermission> },
 
       // Finance
-      { path: "payroll", element: <PayrollList /> },
-      { path: "invoices", element: <InvoiceList /> },
-      { path: "reports", element: <Reports /> },
+      { path: "payroll", element: <RequirePermission permission="payroll.view"><PayrollList /></RequirePermission> },
+      { path: "invoices", element: <RequirePermission permission="invoices.view"><InvoiceList /></RequirePermission> },
+      { path: "revenue", element: <RequirePermission permission="revenue.view"><RevenueDashboard /></RequirePermission> },
+      { path: "reports", element: <RequirePermission permission="reports.view"><Reports /></RequirePermission> },
 
-      // Notifications
+      // Staff Payroll
+      { path: "staff-payroll", element: <RequirePermission permission="staff_payroll.view"><StaffPayrollList /></RequirePermission> },
+
+      // KPI
+      { path: "kpi", element: <RequirePermission permission="kpi.view"><KpiDashboard /></RequirePermission> },
+      { path: "kpi/config", element: <RequirePermission permission="kpi.config"><KpiConfigPage /></RequirePermission> },
+
+      // Notifications - All authenticated
       { path: "notifications", element: <NotificationPage /> },
 
       // System
-      { path: "settings", element: <Settings /> },
-      { path: "staff", element: <StaffList /> },
-      { path: "staff/:id", element: <StaffDetail /> },
-      { path: "roles", element: <RoleList /> },
-      { path: "roles/:id", element: <RoleDetail /> },
+      { path: "settings", element: <RequirePermission permission="settings.manage"><Settings /></RequirePermission> },
+      { path: "staff", element: <RequirePermission permission="users.manage"><StaffList /></RequirePermission> },
+      { path: "staff/:id", element: <RequirePermission permission="users.manage"><StaffDetail /></RequirePermission> },
+      { path: "roles", element: <RequirePermission permission="roles.manage"><RoleList /></RequirePermission> },
+      { path: "roles/:id", element: <RequirePermission permission="roles.manage"><RoleDetail /></RequirePermission> },
     ],
   },
 

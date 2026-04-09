@@ -38,15 +38,15 @@ class StoreInvoiceRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'client_id.required' => 'Khach hang la bat buoc.',
-            'client_id.exists' => 'Khach hang khong ton tai.',
-            'period_start.required' => 'Ngay bat dau ky la bat buoc.',
-            'period_end.required' => 'Ngay ket thuc ky la bat buoc.',
-            'period_end.after_or_equal' => 'Ngay ket thuc phai sau ngay bat dau.',
-            'items.required' => 'Can it nhat 1 hang muc.',
-            'items.*.description.required' => 'Mo ta hang muc la bat buoc.',
-            'items.*.quantity.required' => 'So luong la bat buoc.',
-            'items.*.unit_price.required' => 'Don gia la bat buoc.',
+            'client_id.required' => 'Khách hàng là bắt buộc.',
+            'client_id.exists' => 'Khách hàng không tồn tại.',
+            'period_start.required' => 'Ngày bắt đầu kỳ là bắt buộc.',
+            'period_end.required' => 'Ngày kết thúc kỳ là bắt buộc.',
+            'period_end.after_or_equal' => 'Ngày kết thúc phải sau ngày bắt đầu.',
+            'items.required' => 'Cần ít nhất 1 hạng mục.',
+            'items.*.description.required' => 'Mô tả hạng mục là bắt buộc.',
+            'items.*.quantity.required' => 'Số lượng là bắt buộc.',
+            'items.*.unit_price.required' => 'Đơn giá là bắt buộc.',
         ];
     }
 }

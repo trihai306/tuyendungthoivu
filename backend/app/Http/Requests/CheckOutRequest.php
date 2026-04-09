@@ -31,10 +31,10 @@ class CheckOutRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'attendance_id.required' => 'Vui long chon ban ghi cham cong.',
-            'attendance_id.exists' => 'Ban ghi cham cong khong ton tai.',
-            'check_out.required' => 'Gio check-out la bat buoc.',
-            'check_out.date_format' => 'Gio check-out phai theo dinh dang HH:mm.',
+            'attendance_id.required' => 'Vui lòng chọn bản ghi chấm công.',
+            'attendance_id.exists' => 'Bản ghi chấm công không tồn tại.',
+            'check_out.required' => 'Giờ check-out là bắt buộc.',
+            'check_out.date_format' => 'Giờ check-out phải theo định dạng HH:mm.',
         ];
     }
 }

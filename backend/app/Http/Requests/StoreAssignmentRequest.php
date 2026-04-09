@@ -46,7 +46,7 @@ class StoreAssignmentRequest extends FormRequest
             if ($worker && $worker->status !== WorkerStatus::Available) {
                 $validator->errors()->add(
                     'worker_id',
-                    'Worker hien khong san sang de phan cong (trang thai: ' . $worker->status->label() . ').'
+                    'Worker hiện không sẵn sàng để phân công (trạng thái: ' . $worker->status->label() . ').'
                 );
             }
         });
@@ -60,10 +60,10 @@ class StoreAssignmentRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'staffing_order_id.required' => 'Don hang la bat buoc.',
-            'staffing_order_id.exists' => 'Don hang khong ton tai.',
-            'worker_id.required' => 'Worker la bat buoc.',
-            'worker_id.exists' => 'Worker khong ton tai.',
+            'staffing_order_id.required' => 'Đơn hàng là bắt buộc.',
+            'staffing_order_id.exists' => 'Đơn hàng không tồn tại.',
+            'worker_id.required' => 'Worker là bắt buộc.',
+            'worker_id.exists' => 'Worker không tồn tại.',
         ];
     }
 }

@@ -12,12 +12,14 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\StaffingOrder;
 use App\Models\Worker;
+use App\Traits\ScopesDataByRole;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class DashboardNewController extends Controller
 {
+    use ScopesDataByRole;
     /**
      * Dashboard KPI stats overview.
      */
@@ -27,27 +29,59 @@ class DashboardNewController extends Controller
         $monthStart = now()->startOfMonth()->format('Y-m-d');
         $monthEnd = now()->endOfMonth()->format('Y-m-d');
 
+        $user = $request->user();
+        $isManager = $this->isManagerOrAbove($user);
+
+        // Scope helpers for recruiter-level users
+        $scopeOrders = function ($query) use ($user, $isManager) {
+            if (!$isManager) {
+                $query->where(function ($q) use ($user) {
+                    $q->where('assigned_recruiter_id', $user->id)
+                      ->orWhere('created_by', $user->id);
+                });
+            }
+        };
+
+        $scopeWorkers = function ($query) use ($user, $isManager) {
+            if (!$isManager) {
+                $query->where('registered_by', $user->id);
+            }
+        };
+
+        $scopeAssignments = function ($query) use ($user, $isManager) {
+            if (!$isManager) {
+                $query->where('assigned_by', $user->id);
+            }
+        };
+
         // Active orders (not completed or cancelled)
         $activeOrders = StaffingOrder::whereNotIn('status', [
             OrderStatus::Completed,
             OrderStatus::Cancelled,
-        ])->count();
+        ])->where(function ($q) use ($scopeOrders) { $scopeOrders($q); })->count();
 
         // Workers currently working (assigned status)
-        $workersWorking = Worker::where('status', WorkerStatus::Assigned)->count();
+        $workersWorking = Worker::where('status', WorkerStatus::Assigned)
+            ->where(function ($q) use ($scopeWorkers) { $scopeWorkers($q); })
+            ->count();
 
         // Dispatch today: assignments that need to start today
         $dispatchToday = Assignment::whereHas('order', function ($q) use ($today) {
             $q->where('start_date', $today);
-        })->active()->count();
+        })->active()
+          ->where(function ($q) use ($scopeAssignments) { $scopeAssignments($q); })
+          ->count();
 
-        // Monthly revenue (from invoices paid this month)
-        $monthlyRevenue = Payment::where('payable_type', 'invoice')
-            ->whereBetween('payment_date', [$monthStart, $monthEnd])
-            ->sum('amount');
+        // Monthly revenue (only for manager+)
+        $monthlyRevenue = $isManager
+            ? Payment::where('payable_type', 'invoice')
+                ->whereBetween('payment_date', [$monthStart, $monthEnd])
+                ->sum('amount')
+            : 0;
 
         // Recent orders (6 most recent)
         $recentOrders = StaffingOrder::with('client')
+            ->where(function ($q) use ($scopeOrders) { $scopeOrders($q); })
             ->orderByDesc('created_at')
             ->limit(6)
             ->get()
@@ -67,10 +101,15 @@ class DashboardNewController extends Controller
             });
 
         // Recent activities (latest 5 attendance check-ins)
-        $recentActivities = AttendanceRecord::with(['worker', 'order'])
+        $recentActivitiesQuery = AttendanceRecord::with(['worker', 'order'])
             ->orderByDesc('created_at')
-            ->limit(5)
-            ->get()
+            ->limit(5);
+        if (!$isManager) {
+            $recentActivitiesQuery->whereHas('worker', function ($q) use ($user) {
+                $q->where('registered_by', $user->id);
+            });
+        }
+        $recentActivities = $recentActivitiesQuery->get()
             ->map(function ($att) {
                 return [
                     'id' => $att->id,
@@ -87,7 +126,9 @@ class DashboardNewController extends Controller
             });
 
         // Workers by status
-        $workersByStatus = Worker::select('status', DB::raw('COUNT(*) as count'))
+        $workersByStatusQuery = Worker::select('status', DB::raw('COUNT(*) as count'));
+        $scopeWorkers($workersByStatusQuery);
+        $workersByStatus = $workersByStatusQuery
             ->groupBy('status')
             ->get()
             ->mapWithKeys(function ($item) {
@@ -100,6 +141,7 @@ class DashboardNewController extends Controller
                 $q->where('start_date', $today);
             })
             ->active()
+            ->where(function ($q) use ($scopeAssignments) { $scopeAssignments($q); })
             ->limit(20)
             ->get()
             ->map(function ($assignment) {

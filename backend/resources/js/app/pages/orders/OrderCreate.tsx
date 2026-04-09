@@ -2,6 +2,8 @@ import { Link, useNavigate } from "react-router-dom"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
+import { useClients } from "@/hooks/use-clients"
+import { useCreateStaffingOrder } from "@/hooks/use-staffing-orders"
 import {
   Card,
   CardContent,
@@ -27,57 +29,43 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { Separator } from "@/components/ui/separator"
 import {
   ArrowLeft,
   Building,
   Briefcase,
   Users,
   MapPin,
-  CalendarDays,
-  DollarSign,
   AlertTriangle,
-  FileText,
   Save,
   X,
+  Loader2,
 } from "lucide-react"
-import { toast } from "sonner"
+import type { CreateStaffingOrderDto, GenderRequirement, OrderUrgency, ServiceType } from "@/types"
 
 // ─── Schema ─────────────────────────────────────────────────────────────────
 
 const orderSchema = z.object({
   client_id: z.string().min(1, "Vui lòng chọn khách hàng"),
-  position: z.string().min(1, "Vui lòng nhập vị trí cần tuyển"),
-  description: z.string().min(10, "Mô tả công việc tối thiểu 10 ký tự"),
-  quantity: z.coerce.number().min(1, "Số lượng tối thiểu là 1"),
+  position_name: z.string().min(1, "Vui lòng nhập vị trí cần tuyển"),
+  job_description: z.string().min(10, "Mô tả công việc tối thiểu 10 ký tự"),
+  quantity_needed: z.coerce.number().min(1, "Số lượng tối thiểu là 1"),
   gender_requirement: z.string().optional(),
   age_min: z.coerce.number().min(16).optional().or(z.literal("")),
   age_max: z.coerce.number().max(65).optional().or(z.literal("")),
-  special_skills: z.string().optional(),
-  location: z.string().min(1, "Vui lòng nhập địa điểm làm việc"),
+  other_requirements: z.string().optional(),
+  work_address: z.string().min(1, "Vui lòng nhập địa điểm làm việc"),
+  work_district: z.string().optional(),
+  work_city: z.string().optional(),
   start_date: z.string().min(1, "Vui lòng chọn ngày bắt đầu"),
   end_date: z.string().optional(),
-  shift: z.string().optional(),
-  salary: z.string().optional(),
+  shift_type: z.string().optional(),
+  worker_rate: z.string().optional(),
   urgency: z.string().min(1, "Vui lòng chọn mức độ khẩn cấp"),
   service_type: z.string().min(1, "Vui lòng chọn loại dịch vụ"),
   notes: z.string().optional(),
 })
 
 type OrderFormData = z.infer<typeof orderSchema>
-
-// ─── Mock client list ───────────────────────────────────────────────────────
-
-const MOCK_CLIENTS = [
-  { id: "c1", name: "Công ty TNHH Thực phẩm Vạn Phúc" },
-  { id: "c2", name: "Nhà hàng Hoàng Long" },
-  { id: "c3", name: "Kho vận Tân Cảng" },
-  { id: "c4", name: "Công ty CP May Sài Gòn 3" },
-  { id: "c5", name: "Siêu thị BigC Thăng Long" },
-  { id: "c6", name: "Khách sạn Mường Thanh Luxury" },
-  { id: "c7", name: "Nhà máy Samsung SEVT" },
-  { id: "c8", name: "Công ty TNHH Logistics Gemadept" },
-]
 
 // ─── Sub-components ─────────────────────────────────────────────────────────
 
@@ -113,28 +101,37 @@ function FormField({
 export function OrderCreate() {
   const navigate = useNavigate()
 
+  // Fetch clients for dropdown
+  const { data: clientsData, isLoading: clientsLoading } = useClients({ per_page: 100 })
+  const clients = clientsData?.data ?? []
+
+  // Create mutation
+  const createMutation = useCreateStaffingOrder()
+
   const {
     register,
     handleSubmit,
     setValue,
     watch,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<OrderFormData>({
     resolver: zodResolver(orderSchema),
     defaultValues: {
       client_id: "",
-      position: "",
-      description: "",
-      quantity: 1,
+      position_name: "",
+      job_description: "",
+      quantity_needed: 1,
       gender_requirement: "",
       age_min: "" as unknown as number,
       age_max: "" as unknown as number,
-      special_skills: "",
-      location: "",
+      other_requirements: "",
+      work_address: "",
+      work_district: "",
+      work_city: "",
       start_date: "",
       end_date: "",
-      shift: "",
-      salary: "",
+      shift_type: "",
+      worker_rate: "",
       urgency: "normal",
       service_type: "",
       notes: "",
@@ -142,10 +139,46 @@ export function OrderCreate() {
   })
 
   const onSubmit = (data: OrderFormData) => {
-    // Mock submit
-    console.log("Order data:", data)
-    toast.success("Tạo yêu cầu thành công!")
-    navigate("/orders")
+    // Build the DTO from form data
+    const dto: CreateStaffingOrderDto = {
+      client_id: data.client_id,
+      position_name: data.position_name,
+      job_description: data.job_description || undefined,
+      quantity_needed: data.quantity_needed,
+      work_address: data.work_address || undefined,
+      work_district: data.work_district || undefined,
+      work_city: data.work_city || undefined,
+      start_date: data.start_date,
+      end_date: data.end_date || undefined,
+      shift_type: data.shift_type || undefined,
+      urgency: (data.urgency as OrderUrgency) || undefined,
+      service_type: (data.service_type as ServiceType) || undefined,
+      notes: data.notes || undefined,
+      other_requirements: data.other_requirements || undefined,
+    }
+
+    // Add optional numeric fields
+    if (data.gender_requirement && data.gender_requirement !== "") {
+      dto.gender_requirement = data.gender_requirement as GenderRequirement
+    }
+    if (data.age_min && typeof data.age_min === "number") {
+      dto.age_min = data.age_min
+    }
+    if (data.age_max && typeof data.age_max === "number") {
+      dto.age_max = data.age_max
+    }
+    if (data.worker_rate) {
+      const rate = parseFloat(data.worker_rate.replace(/[^0-9.]/g, ""))
+      if (!isNaN(rate) && rate > 0) {
+        dto.worker_rate = rate
+      }
+    }
+
+    createMutation.mutate(dto, {
+      onSuccess: (newOrder) => {
+        navigate(`/orders/${newOrder.id}`)
+      },
+    })
   }
 
   return (
@@ -204,14 +237,15 @@ export function OrderCreate() {
                 <Select
                   value={watch("client_id")}
                   onValueChange={(val) => setValue("client_id", val as string, { shouldValidate: true })}
+                  disabled={clientsLoading}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Chọn khách hàng" />
+                    <SelectValue placeholder={clientsLoading ? "Đang tải..." : "Chọn khách hàng"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {MOCK_CLIENTS.map((client) => (
+                    {clients.map((client) => (
                       <SelectItem key={client.id} value={client.id}>
-                        {client.name}
+                        {client.company_name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -255,24 +289,24 @@ export function OrderCreate() {
               <FormField
                 label="Vị trí cần tuyển"
                 required
-                error={errors.position?.message}
+                error={errors.position_name?.message}
               >
                 <Input
                   placeholder="VD: Công nhân đóng gói, Phục vụ nhà hàng..."
-                  {...register("position")}
+                  {...register("position_name")}
                 />
               </FormField>
 
               <FormField
                 label="Số lượng ứng viên"
                 required
-                error={errors.quantity?.message}
+                error={errors.quantity_needed?.message}
               >
                 <Input
                   type="number"
                   min={1}
                   placeholder="Nhập số lượng"
-                  {...register("quantity")}
+                  {...register("quantity_needed")}
                 />
               </FormField>
             </div>
@@ -280,22 +314,22 @@ export function OrderCreate() {
             <FormField
               label="Mô tả công việc"
               required
-              error={errors.description?.message}
+              error={errors.job_description?.message}
             >
               <Textarea
                 placeholder="Mô tả chi tiết công việc, yêu cầu, quy trình làm việc..."
                 rows={4}
-                {...register("description")}
+                {...register("job_description")}
               />
             </FormField>
 
             <FormField
               label="Mức lương đề xuất"
-              error={errors.salary?.message}
+              error={errors.worker_rate?.message}
             >
               <Input
-                placeholder="VD: 280,000 VNĐ/ngày hoặc 5,000,000 VNĐ/tháng"
-                {...register("salary")}
+                placeholder="VD: 280000 (VNĐ/ngày)"
+                {...register("worker_rate")}
               />
             </FormField>
           </CardContent>
@@ -323,7 +357,6 @@ export function OrderCreate() {
                     <SelectItem value="any">Không yêu cầu</SelectItem>
                     <SelectItem value="male">Nam</SelectItem>
                     <SelectItem value="female">Nữ</SelectItem>
-                    <SelectItem value="both">Nam/Nữ</SelectItem>
                   </SelectContent>
                 </Select>
               </FormField>
@@ -349,11 +382,11 @@ export function OrderCreate() {
               </FormField>
             </div>
 
-            <FormField label="Kỹ năng đặc biệt">
+            <FormField label="Yêu cầu khác">
               <Textarea
                 placeholder="VD: Biết lái xe nâng, có chứng chỉ VSATTP, tiếng Anh giao tiếp..."
                 rows={2}
-                {...register("special_skills")}
+                {...register("other_requirements")}
               />
             </FormField>
           </CardContent>
@@ -371,13 +404,29 @@ export function OrderCreate() {
             <FormField
               label="Địa điểm làm việc"
               required
-              error={errors.location?.message}
+              error={errors.work_address?.message}
             >
               <Input
                 placeholder="VD: KCN Tân Phú Trung, Củ Chi, TP.HCM"
-                {...register("location")}
+                {...register("work_address")}
               />
             </FormField>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField label="Quận/Huyện">
+                <Input
+                  placeholder="VD: Củ Chi"
+                  {...register("work_district")}
+                />
+              </FormField>
+
+              <FormField label="Tỉnh/Thành phố">
+                <Input
+                  placeholder="VD: TP.HCM"
+                  {...register("work_city")}
+                />
+              </FormField>
+            </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
@@ -396,7 +445,7 @@ export function OrderCreate() {
             <FormField label="Ca làm việc">
               <Input
                 placeholder="VD: Ca sáng 7:00-15:00, Ca chiều 15:00-23:00"
-                {...register("shift")}
+                {...register("shift_type")}
               />
             </FormField>
           </CardContent>
@@ -447,13 +496,18 @@ export function OrderCreate() {
             type="button"
             variant="outline"
             onClick={() => navigate("/orders")}
+            disabled={createMutation.isPending}
           >
             <X className="mr-1.5 h-3.5 w-3.5" />
             Hủy bỏ
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
-            <Save className="mr-1.5 h-3.5 w-3.5" />
-            {isSubmitting ? "Đang tạo..." : "Tạo yêu cầu"}
+          <Button type="submit" disabled={createMutation.isPending}>
+            {createMutation.isPending ? (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Save className="mr-1.5 h-3.5 w-3.5" />
+            )}
+            {createMutation.isPending ? "Đang tạo..." : "Tạo yêu cầu"}
           </Button>
         </div>
       </form>

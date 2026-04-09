@@ -35,6 +35,7 @@ import {
 import { useRole, usePermissions, useSyncPermissions } from "@/hooks/use-roles"
 import type { Permission } from "@/types/rbac"
 import { toast } from "sonner"
+import { usePermissions as useCanPermissions } from "@/hooks/use-permissions"
 
 // Role icon metadata
 interface RoleIconMeta {
@@ -76,6 +77,7 @@ function groupPermissionsByModule(permissions: Permission[]): PermissionModule[]
 }
 
 export function RoleDetail() {
+  const can = useCanPermissions()
   const { id } = useParams<{ id: string }>()
   const { data: role, isLoading: roleLoading, isError: roleError } = useRole(id)
   const { data: allPermissions, isLoading: permsLoading } = usePermissions()
@@ -288,6 +290,7 @@ export function RoleDetail() {
                               checked={isGranted}
                               size="sm"
                               onCheckedChange={(checked: boolean) => handleTogglePermission(perm.id, checked)}
+                              disabled={!can("roles.manage")}
                               className="ml-1"
                             />
                           </div>

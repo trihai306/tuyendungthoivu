@@ -25,10 +25,12 @@ import {
   Minus,
   ArrowUp,
   AlertTriangle,
+  Loader2,
 } from "lucide-react"
-import type { TaskPriority } from "@/types/task"
-import { mockUsers } from "@/data/mock-tasks"
+import type { TaskPriority, TaskType } from "@/types/task"
 import type { LucideIcon } from "lucide-react"
+import { useCreateTask } from "@/hooks/use-tasks"
+import { useStaffList } from "@/hooks/use-staff"
 
 interface TaskCreateProps {
   open: boolean
@@ -101,19 +103,34 @@ export function TaskCreate({ open, onOpenChange }: TaskCreateProps) {
   const [deadline, setDeadline] = useState("")
   const [notes, setNotes] = useState("")
 
+  const createTask = useCreateTask()
+  const { data: staffData, isLoading: isLoadingStaff } = useStaffList({
+    per_page: 100,
+    is_active: true,
+  })
+
+  const staffMembers = staffData?.data ?? []
+
   const handleSubmit = () => {
-    // Mock submit - in real app, this would call the API
-    console.log({
-      title,
-      description,
-      type: taskType,
-      assigned_to: assignedTo,
-      priority,
-      deadline,
-      notes,
-    })
-    handleReset()
-    onOpenChange(false)
+    if (!isValid) return
+
+    createTask.mutate(
+      {
+        title,
+        description,
+        type: taskType as TaskType,
+        priority,
+        assigned_to_id: assignedTo,
+        deadline,
+        notes: notes || undefined,
+      },
+      {
+        onSuccess: () => {
+          handleReset()
+          onOpenChange(false)
+        },
+      },
+    )
   }
 
   const handleReset = () => {
@@ -194,21 +211,32 @@ export function TaskCreate({ open, onOpenChange }: TaskCreateProps) {
               </Label>
               <Select value={assignedTo} onValueChange={setAssignedTo}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Chọn nhân viên" />
+                  <SelectValue placeholder={isLoadingStaff ? "Đang tải..." : "Chọn nhân viên"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {mockUsers.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-4 w-4">
-                          <AvatarFallback className="bg-gradient-to-br from-primary/80 to-primary text-[6px] font-semibold text-primary-foreground">
-                            {getInitials(user.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        {user.name}
-                      </div>
-                    </SelectItem>
-                  ))}
+                  {isLoadingStaff ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      <span className="ml-2 text-sm text-muted-foreground">Đang tải...</span>
+                    </div>
+                  ) : staffMembers.length === 0 ? (
+                    <div className="py-4 text-center text-sm text-muted-foreground">
+                      Không có nhân viên nào
+                    </div>
+                  ) : (
+                    staffMembers.map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-4 w-4">
+                            <AvatarFallback className="bg-gradient-to-br from-primary/80 to-primary text-[6px] font-semibold text-primary-foreground">
+                              {getInitials(member.name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          {member.name}
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -278,9 +306,13 @@ export function TaskCreate({ open, onOpenChange }: TaskCreateProps) {
           >
             Hủy
           </Button>
-          <Button onClick={handleSubmit} disabled={!isValid}>
-            <ClipboardList className="mr-1.5 h-3.5 w-3.5" />
-            Giao việc
+          <Button onClick={handleSubmit} disabled={!isValid || createTask.isPending}>
+            {createTask.isPending ? (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <ClipboardList className="mr-1.5 h-3.5 w-3.5" />
+            )}
+            {createTask.isPending ? "Đang xử lý..." : "Giao việc"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -25,6 +25,10 @@ use App\Http\Controllers\Api\V1\PayrollNewController;
 use App\Http\Controllers\Api\V1\InvoiceNewController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\DashboardNewController;
+use App\Http\Controllers\Api\V1\KpiController;
+use App\Http\Controllers\Api\V1\StaffPayrollController;
+use App\Http\Controllers\Api\V1\RevenueReportController;
+use App\Http\Controllers\Api\V1\UploadController;
 
 Route::prefix('v1')->group(function () {
     // Auth
@@ -45,6 +49,10 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
         Route::get('auth/me', [AuthController::class, 'me']);
+
+        // File upload
+        Route::post('upload', [UploadController::class, 'store']);
+        Route::delete('upload', [UploadController::class, 'destroy']);
 
         Route::apiResource('worker-profiles', WorkerProfileController::class);
         Route::apiResource('employers', EmployerController::class);
@@ -149,63 +157,152 @@ Route::prefix('v1')->group(function () {
         // ===== NEW STAFFING SYSTEM ROUTES =====
 
         // ── Clients ─────────────────────────────────────────────────
-        Route::apiResource('clients', ClientController::class);
+        Route::middleware('permission:clients.view')->group(function () {
+            Route::get('clients', [ClientController::class, 'index']);
+            Route::get('clients/{client}', [ClientController::class, 'show']);
+        });
+        Route::middleware('permission:clients.create')->post('clients', [ClientController::class, 'store']);
+        Route::middleware('permission:clients.update')->put('clients/{client}', [ClientController::class, 'update']);
+        Route::middleware('permission:clients.delete')->delete('clients/{client}', [ClientController::class, 'destroy']);
 
         // ── Staffing Orders ─────────────────────────────────────────
-        Route::apiResource('staffing-orders', StaffingOrderController::class);
-        Route::post('staffing-orders/{order}/approve', [StaffingOrderController::class, 'approve']);
-        Route::post('staffing-orders/{order}/assign', [StaffingOrderController::class, 'assign']);
-        Route::patch('staffing-orders/{order}/status', [StaffingOrderController::class, 'updateStatus']);
+        Route::middleware('permission:orders.view')->group(function () {
+            Route::get('staffing-orders', [StaffingOrderController::class, 'index']);
+            Route::get('staffing-orders/{staffing_order}', [StaffingOrderController::class, 'show']);
+        });
+        Route::middleware('permission:orders.create')->post('staffing-orders', [StaffingOrderController::class, 'store']);
+        Route::middleware('permission:orders.update')->group(function () {
+            Route::put('staffing-orders/{staffing_order}', [StaffingOrderController::class, 'update']);
+            Route::patch('staffing-orders/{order}/status', [StaffingOrderController::class, 'updateStatus']);
+        });
+        Route::middleware('permission:orders.delete')->delete('staffing-orders/{staffing_order}', [StaffingOrderController::class, 'destroy']);
+        Route::middleware('permission:orders.approve')->post('staffing-orders/{order}/approve', [StaffingOrderController::class, 'approve']);
+        Route::middleware('permission:orders.assign')->post('staffing-orders/{order}/assign', [StaffingOrderController::class, 'assign']);
 
         // ── Workers (new staffing system) ───────────────────────────
-        Route::apiResource('workers-new', WorkerController::class);
-        Route::patch('workers-new/{worker}/status', [WorkerController::class, 'updateStatus']);
-        Route::post('workers-new/{worker}/assign-staff', [WorkerController::class, 'assignStaff']);
+        Route::middleware('permission:workers.view')->group(function () {
+            Route::get('workers-new', [WorkerController::class, 'index']);
+            Route::get('workers-new/{workers_new}', [WorkerController::class, 'show']);
+        });
+        Route::middleware('permission:workers.create')->post('workers-new', [WorkerController::class, 'store']);
+        Route::middleware('permission:workers.update')->put('workers-new/{workers_new}', [WorkerController::class, 'update']);
+        Route::middleware('permission:workers.delete')->delete('workers-new/{workers_new}', [WorkerController::class, 'destroy']);
+        Route::middleware('permission:workers.change_status')->patch('workers-new/{worker}/status', [WorkerController::class, 'updateStatus']);
+        Route::middleware('permission:workers.assign_staff')->post('workers-new/{worker}/assign-staff', [WorkerController::class, 'assignStaff']);
+        Route::middleware('permission:workers.view')->get('workers-new/{worker}/evaluation', [WorkerController::class, 'evaluation']);
 
         // ── Assignments ─────────────────────────────────────────────
-        Route::apiResource('assignments', AssignmentController::class)->except(['edit']);
-        Route::patch('assignments/{assignment}/status', [AssignmentController::class, 'updateStatus']);
-        Route::post('assignments/bulk', [AssignmentController::class, 'bulkAssign']);
-        Route::delete('assignments/{assignment}/remove', [AssignmentController::class, 'remove']);
+        Route::middleware('permission:assignments.view')->group(function () {
+            Route::get('assignments', [AssignmentController::class, 'index']);
+            Route::get('assignments/{assignment}', [AssignmentController::class, 'show']);
+        });
+        Route::middleware('permission:assignments.create')->group(function () {
+            Route::post('assignments', [AssignmentController::class, 'store']);
+            Route::post('assignments/bulk', [AssignmentController::class, 'bulkAssign']);
+        });
+        Route::middleware('permission:assignments.update')->patch('assignments/{assignment}/status', [AssignmentController::class, 'updateStatus']);
+        Route::middleware('permission:assignments.delete')->delete('assignments/{assignment}/remove', [AssignmentController::class, 'remove']);
 
         // ===== FINANCE & OPERATIONS MODULE ROUTES =====
 
-        // ── Attendance (new) ────────────────────────────────────────
-        Route::prefix('attendances-new')->group(function () {
-            Route::get('/', [AttendanceNewController::class, 'index']);
-            Route::post('/check-in', [AttendanceNewController::class, 'checkIn']);
-            Route::post('/check-out', [AttendanceNewController::class, 'checkOut']);
-            Route::post('/bulk-check-in', [AttendanceNewController::class, 'bulkCheckIn']);
-            Route::post('/{id}/approve', [AttendanceNewController::class, 'approve']);
-            Route::post('/bulk-approve', [AttendanceNewController::class, 'bulkApprove']);
-            Route::get('/daily-report/{orderId}', [AttendanceNewController::class, 'dailyReport']);
-            Route::get('/weekly-report', [AttendanceNewController::class, 'weeklyReport']);
-            Route::get('/monthly-report/{workerId}', [AttendanceNewController::class, 'monthlyReport']);
+        // ── Attendance ──────────────────────────────────────────────
+        Route::middleware('permission:attendance.view')->group(function () {
+            Route::prefix('attendances-new')->group(function () {
+                Route::get('/', [AttendanceNewController::class, 'index']);
+                Route::get('/daily-report/{orderId}', [AttendanceNewController::class, 'dailyReport']);
+                Route::get('/weekly-report', [AttendanceNewController::class, 'weeklyReport']);
+                Route::get('/monthly-report/{workerId}', [AttendanceNewController::class, 'monthlyReport']);
+            });
+        });
+        Route::middleware('permission:attendance.checkin')->group(function () {
+            Route::post('attendances-new/check-in', [AttendanceNewController::class, 'checkIn']);
+            Route::post('attendances-new/check-out', [AttendanceNewController::class, 'checkOut']);
+            Route::post('attendances-new/bulk-check-in', [AttendanceNewController::class, 'bulkCheckIn']);
+        });
+        Route::middleware('permission:attendance.approve')->group(function () {
+            Route::post('attendances-new/{id}/approve', [AttendanceNewController::class, 'approve']);
+            Route::post('attendances-new/bulk-approve', [AttendanceNewController::class, 'bulkApprove']);
         });
 
-        // ── Payroll (new) ───────────────────────────────────────────
-        Route::prefix('payrolls-new')->group(function () {
-            Route::get('/', [PayrollNewController::class, 'index']);
-            Route::get('/export', [PayrollNewController::class, 'export']);
-            Route::get('/{payroll}', [PayrollNewController::class, 'show']);
-            Route::post('/calculate', [PayrollNewController::class, 'calculate']);
-            Route::post('/bulk-calculate', [PayrollNewController::class, 'bulkCalculate']);
-            Route::post('/{payroll}/review', [PayrollNewController::class, 'review']);
-            Route::post('/{payroll}/approve', [PayrollNewController::class, 'approve']);
-            Route::post('/{payroll}/pay', [PayrollNewController::class, 'markPaid']);
-            Route::post('/bulk-pay', [PayrollNewController::class, 'bulkPay']);
+        // ── Payroll (Workers) ───────────────────────────────────────
+        Route::middleware('permission:payroll.view')->group(function () {
+            Route::get('payrolls-new', [PayrollNewController::class, 'index']);
+            Route::get('payrolls-new/export', [PayrollNewController::class, 'export']);
+            Route::get('payrolls-new/{payroll}', [PayrollNewController::class, 'show']);
+        });
+        Route::middleware('permission:payroll.calculate')->group(function () {
+            Route::post('payrolls-new/calculate', [PayrollNewController::class, 'calculate']);
+            Route::post('payrolls-new/bulk-calculate', [PayrollNewController::class, 'bulkCalculate']);
+            Route::post('payrolls-new/{payroll}/review', [PayrollNewController::class, 'review']);
+        });
+        Route::middleware('permission:payroll.approve')->post('payrolls-new/{payroll}/approve', [PayrollNewController::class, 'approve']);
+        Route::middleware('permission:payroll.pay')->group(function () {
+            Route::post('payrolls-new/{payroll}/pay', [PayrollNewController::class, 'markPaid']);
+            Route::post('payrolls-new/bulk-pay', [PayrollNewController::class, 'bulkPay']);
         });
 
-        // ── Invoices (new) ──────────────────────────────────────────
-        Route::apiResource('invoices-new', InvoiceNewController::class);
-        Route::post('invoices-new/{invoice}/send', [InvoiceNewController::class, 'send']);
-        Route::post('invoices-new/{invoice}/payment', [InvoiceNewController::class, 'recordPayment']);
-        Route::post('invoices-new/{invoice}/duplicate', [InvoiceNewController::class, 'duplicate']);
+        // ── Invoices ────────────────────────────────────────────────
+        Route::middleware('permission:invoices.view')->group(function () {
+            Route::get('invoices-new', [InvoiceNewController::class, 'index']);
+            Route::get('invoices-new/{invoices_new}', [InvoiceNewController::class, 'show']);
+        });
+        Route::middleware('permission:invoices.create')->group(function () {
+            Route::post('invoices-new', [InvoiceNewController::class, 'store']);
+            Route::post('invoices-new/{invoice}/duplicate', [InvoiceNewController::class, 'duplicate']);
+        });
+        Route::middleware('permission:invoices.update')->put('invoices-new/{invoices_new}', [InvoiceNewController::class, 'update']);
+        Route::middleware('permission:invoices.send')->post('invoices-new/{invoice}/send', [InvoiceNewController::class, 'send']);
+        Route::middleware('permission:invoices.payment')->group(function () {
+            Route::post('invoices-new/{invoice}/payment', [InvoiceNewController::class, 'recordPayment']);
+            Route::apiResource('payments', PaymentController::class)->only(['index', 'store']);
+        });
 
-        // ── Payments ────────────────────────────────────────────────
-        Route::apiResource('payments', PaymentController::class)->only(['index', 'store']);
+        // ── Revenue & Reports ───────────────────────────────────────
+        Route::middleware('permission:revenue.view')->prefix('revenue')->group(function () {
+            Route::get('/overview', [RevenueReportController::class, 'overview']);
+            Route::get('/by-client', [RevenueReportController::class, 'byClient']);
+            Route::get('/trend', [RevenueReportController::class, 'trend']);
+            Route::get('/staff-payroll-summary', [RevenueReportController::class, 'staffPayrollSummary']);
+        });
 
         // ── Dashboard (new stats) ───────────────────────────────────
         Route::get('dashboard-new/stats', [DashboardNewController::class, 'stats']);
+
+        // ── KPI ─────────────────────────────────────────────────────
+        Route::middleware('permission:kpi.view')->prefix('kpi')->group(function () {
+            Route::get('/periods', [KpiController::class, 'periods']);
+            Route::get('/periods/{id}', [KpiController::class, 'showPeriod']);
+            Route::get('/records', [KpiController::class, 'records']);
+            Route::get('/users/{userId}/summary', [KpiController::class, 'userKpiSummary']);
+        });
+        Route::middleware('permission:kpi.evaluate')->post('kpi/records/{id}/evaluate', [KpiController::class, 'evaluate']);
+        Route::middleware('permission:kpi.config')->prefix('kpi')->group(function () {
+            Route::get('/configs', [KpiController::class, 'configs']);
+            Route::post('/configs', [KpiController::class, 'storeConfig']);
+            Route::put('/configs/{id}', [KpiController::class, 'updateConfig']);
+            Route::delete('/configs/{id}', [KpiController::class, 'destroyConfig']);
+            Route::post('/periods', [KpiController::class, 'storePeriod']);
+            Route::post('/periods/{id}/close', [KpiController::class, 'closePeriod']);
+            Route::post('/periods/{id}/auto-calculate', [KpiController::class, 'autoCalculate']);
+        });
+
+        // ── Staff Payroll ───────────────────────────────────────────
+        Route::middleware('permission:staff_payroll.view')->prefix('staff-payroll')->group(function () {
+            Route::get('/salary-configs', [StaffPayrollController::class, 'salaryConfigs']);
+            Route::get('/', [StaffPayrollController::class, 'index']);
+            Route::get('/{id}', [StaffPayrollController::class, 'show']);
+        });
+        Route::middleware('permission:staff_payroll.manage')->prefix('staff-payroll')->group(function () {
+            Route::post('/salary-configs', [StaffPayrollController::class, 'storeSalaryConfig']);
+            Route::put('/salary-configs/{id}', [StaffPayrollController::class, 'updateSalaryConfig']);
+            Route::put('/{id}', [StaffPayrollController::class, 'update']);
+            Route::post('/calculate', [StaffPayrollController::class, 'calculate']);
+            Route::post('/bulk-calculate', [StaffPayrollController::class, 'bulkCalculate']);
+            Route::post('/{id}/review', [StaffPayrollController::class, 'review']);
+            Route::post('/{id}/approve', [StaffPayrollController::class, 'approve']);
+            Route::post('/{id}/pay', [StaffPayrollController::class, 'markPaid']);
+            Route::post('/bulk-approve', [StaffPayrollController::class, 'bulkApprove']);
+            Route::post('/bulk-pay', [StaffPayrollController::class, 'bulkPay']);
+        });
     });
 });

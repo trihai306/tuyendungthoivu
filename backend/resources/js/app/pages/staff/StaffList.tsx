@@ -60,6 +60,7 @@ import type { StaffRole } from "@/types/staff"
 import { useStaffList, useToggleStaffActive } from "@/hooks/use-staff"
 import { useDepartments } from "@/hooks/use-departments"
 import { toast } from "sonner"
+import { usePermissions } from "@/hooks/use-permissions"
 
 // --- Role config ---
 
@@ -145,6 +146,7 @@ const statusOptions = [
 ]
 
 export function StaffList() {
+  const can = usePermissions()
   const [search, setSearch] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState("")
   const [roleFilter, setRoleFilter] = useState("")
@@ -232,10 +234,12 @@ export function StaffList() {
             </p>
           </div>
           <div className="hidden sm:flex gap-2">
-            <Button size="sm" className="bg-white text-primary hover:bg-white/90 shadow-sm" onClick={() => toast.info("Tính năng đang phát triển")}>
-              <Plus className="mr-1.5 h-3.5 w-3.5" />
-              Thêm nhân viên
-            </Button>
+            {can("users.manage") && (
+              <Button size="sm" className="bg-white text-primary hover:bg-white/90 shadow-sm" onClick={() => toast.info("Tính năng đang phát triển")}>
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                Thêm nhân viên
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -483,22 +487,28 @@ export function StaffList() {
                               <Eye className="h-4 w-4" />
                               Xem chi tiết
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => toast.info("Tính năng đang phát triển")}>
-                              <Pencil className="h-4 w-4" />
-                              Sửa thông tin
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => toast.info("Tính năng đang phát triển")}>
-                              <ClipboardList className="h-4 w-4" />
-                              Giao việc
-                            </DropdownMenuItem>
+                            {can("users.manage") && (
+                              <DropdownMenuItem onClick={() => toast.info("Tính năng đang phát triển")}>
+                                <Pencil className="h-4 w-4" />
+                                Sửa thông tin
+                              </DropdownMenuItem>
+                            )}
+                            {can("tasks.assign") && (
+                              <DropdownMenuItem onClick={() => toast.info("Tính năng đang phát triển")}>
+                                <ClipboardList className="h-4 w-4" />
+                                Giao việc
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              variant="destructive"
-                              onClick={() => toggleActive.mutate(staff.id)}
-                            >
-                              <Ban className="h-4 w-4" />
-                              {staff.is_active ? "Vô hiệu hóa" : "Kích hoạt lại"}
-                            </DropdownMenuItem>
+                            {can("users.manage") && (
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onClick={() => toggleActive.mutate(staff.id)}
+                              >
+                                <Ban className="h-4 w-4" />
+                                {staff.is_active ? "Vô hiệu hóa" : "Kích hoạt lại"}
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

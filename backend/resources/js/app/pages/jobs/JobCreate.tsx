@@ -120,6 +120,7 @@ export function JobCreate() {
     register,
     handleSubmit,
     control,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<JobCreateFormData>({
     resolver: zodResolver(jobCreateSchema),
@@ -161,9 +162,30 @@ export function JobCreate() {
     navigate("/jobs")
   }
 
-  const onSaveDraft = () => {
-    // TODO: Save draft via API
-    console.log("Save draft")
+  const onSaveDraft = async () => {
+    const data = getValues()
+    try {
+      await createJob.mutateAsync({
+        title: data.title || "Bản nháp chưa đặt tên",
+        description: data.description || "",
+        requirements: data.requirements || null,
+        benefits: data.benefits || null,
+        salary_min: data.salary_min || null,
+        salary_max: data.salary_max || null,
+        salary_type: data.salary_type || null,
+        city: data.city || null,
+        district: data.district || null,
+        location: data.location || null,
+        job_type: data.job_type,
+        positions_count: data.positions_count || 1,
+        start_date: data.start_date || null,
+        end_date: data.end_date || null,
+        status: "draft",
+      })
+      navigate("/jobs")
+    } catch {
+      // Error toast is handled by the useCreateJob hook
+    }
   }
 
   const isBusy = isSubmitting || createJob.isPending
@@ -526,9 +548,10 @@ export function JobCreate() {
               type="button"
               variant="outline"
               onClick={onSaveDraft}
+              disabled={isBusy}
             >
               <Save className="mr-1.5 h-3.5 w-3.5" />
-              Lưu nháp
+              {createJob.isPending ? "Đang lưu..." : "Lưu nháp"}
             </Button>
             <Button type="submit" disabled={isBusy}>
               <Send className="mr-1.5 h-3.5 w-3.5" />

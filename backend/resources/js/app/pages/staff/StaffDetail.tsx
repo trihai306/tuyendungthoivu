@@ -28,6 +28,7 @@ import {
 } from "lucide-react"
 import type { StaffRole } from "@/types/staff"
 import { useStaffDetail } from "@/hooks/use-staff"
+import { usePermissions } from "@/hooks/use-permissions"
 
 // --- Role config ---
 
@@ -88,6 +89,7 @@ function formatDate(dateStr: string): string {
 }
 
 export function StaffDetail() {
+  const can = usePermissions()
   const { id } = useParams<{ id: string }>()
   const { data: staffData, isLoading, isError } = useStaffDetail(id)
 
@@ -191,8 +193,12 @@ export function StaffDetail() {
               </div>
             </div>
             <div className="flex gap-2 sm:pb-1">
-              <Button variant="outline" size="sm">Sửa thông tin</Button>
-              <Button size="sm">Giao việc</Button>
+              {can("users.manage") && (
+                <Button variant="outline" size="sm">Sửa thông tin</Button>
+              )}
+              {can("tasks.assign") && (
+                <Button size="sm">Giao việc</Button>
+              )}
             </div>
           </div>
         </CardContent>
@@ -298,7 +304,7 @@ export function StaffDetail() {
                   <ClipboardList className="h-4 w-4 text-primary" />
                   Danh sách công việc
                 </CardTitle>
-                <Button size="sm">Giao việc mới</Button>
+                {can("tasks.assign") && <Button size="sm">Giao việc mới</Button>}
               </div>
             </CardHeader>
             <CardContent>

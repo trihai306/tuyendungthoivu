@@ -56,6 +56,7 @@ import {
   FileText,
 } from "lucide-react"
 import { toast } from "sonner"
+import { usePermissions } from "@/hooks/use-permissions"
 
 // --- Types ---
 
@@ -443,6 +444,7 @@ function StatusBadge({ status }: { status: InvoiceStatus }) {
 const ITEMS_PER_PAGE = 8
 
 export function InvoiceList() {
+  const can = usePermissions()
   const [invoices, setInvoices] = useState<Invoice[]>(initialInvoicesData)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("")
@@ -602,10 +604,12 @@ export function InvoiceList() {
             <FileDown className="h-4 w-4" />
             Xuất báo cáo
           </Button>
-          <Button className="gap-2" onClick={handleCreateInvoice}>
-            <Plus className="h-4 w-4" />
-            Tạo hóa đơn
-          </Button>
+          {can("invoices.create") && (
+            <Button className="gap-2" onClick={handleCreateInvoice}>
+              <Plus className="h-4 w-4" />
+              Tạo hóa đơn
+            </Button>
+          )}
         </div>
       </div>
 
@@ -794,18 +798,24 @@ export function InvoiceList() {
                               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handlePrintInvoice(inv) }}>
                                 <Printer className="mr-2 h-4 w-4" /> In hóa đơn
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleSendEmail(inv) }}>
-                                <Mail className="mr-2 h-4 w-4" /> Gửi email
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDuplicate(inv) }}>
-                                <Copy className="mr-2 h-4 w-4" /> Nhân bản
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={(e) => { e.stopPropagation(); handleDelete(inv) }}
-                                className="text-destructive focus:text-destructive"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" /> Xóa
-                              </DropdownMenuItem>
+                              {can("invoices.send") && (
+                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleSendEmail(inv) }}>
+                                  <Mail className="mr-2 h-4 w-4" /> Gửi email
+                                </DropdownMenuItem>
+                              )}
+                              {can("invoices.create") && (
+                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDuplicate(inv) }}>
+                                  <Copy className="mr-2 h-4 w-4" /> Nhân bản
+                                </DropdownMenuItem>
+                              )}
+                              {can("invoices.update") && (
+                                <DropdownMenuItem
+                                  onClick={(e) => { e.stopPropagation(); handleDelete(inv) }}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" /> Xóa
+                                </DropdownMenuItem>
+                              )}
                             </DropdownMenuGroup>
                           </DropdownMenuContent>
                         </DropdownMenu>

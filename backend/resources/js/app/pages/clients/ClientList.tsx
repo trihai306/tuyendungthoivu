@@ -1,10 +1,16 @@
-import { useState } from "react"
+import { useState, useMemo, useCallback } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { toast } from "sonner"
+import { useAuthStore } from "@/stores/auth-store"
+import { hasPermission } from "@/types/user"
+import { useClients, useDeleteClient } from "@/hooks/use-clients"
+import type { Client, ClientStatus } from "@/types/staffing"
+import type { ClientFilter } from "@/services/clients.service"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Select,
   SelectContent,
@@ -20,6 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { SortableHeader } from "@/components/ui/sortable-header"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +34,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
   Search,
   Building2,
@@ -42,174 +59,23 @@ import {
   TrendingUp,
   ShoppingCart,
   DollarSign,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
 } from "lucide-react"
-
-// --- Types ---
-
-interface Client {
-  id: string
-  code: string
-  name: string
-  industry: string
-  address: string
-  contactName: string
-  contactRole: string
-  contactPhone: string
-  contactEmail: string
-  activeOrders: number
-  totalWorkers: number
-  status: "active" | "paused" | "new"
-}
-
-// --- Mock data ---
-
-const mockClients: Client[] = [
-  {
-    id: "1",
-    code: "KH-001",
-    name: "Công ty TNHH Thực phẩm Việt",
-    industry: "F&B",
-    address: "Quận 7, TP. Hồ Chí Minh",
-    contactName: "Nguyễn Văn An",
-    contactRole: "Trưởng phòng Nhân sự",
-    contactPhone: "0901 234 567",
-    contactEmail: "an.nguyen@thucphamviet.vn",
-    activeOrders: 3,
-    totalWorkers: 24,
-    status: "active",
-  },
-  {
-    id: "2",
-    code: "KH-002",
-    name: "Nhà máy Samsung HCMC",
-    industry: "Sản xuất",
-    address: "KCN Tân Phú Trung, Củ Chi",
-    contactName: "Trần Minh Tuấn",
-    contactRole: "Quản lý sản xuất",
-    contactPhone: "0912 345 678",
-    contactEmail: "tuan.tran@samsung.com",
-    activeOrders: 5,
-    totalWorkers: 48,
-    status: "active",
-  },
-  {
-    id: "3",
-    code: "KH-003",
-    name: "Công ty CP Sự kiện Galaxy",
-    industry: "Sự kiện",
-    address: "Quận 1, TP. Hồ Chí Minh",
-    contactName: "Lê Thị Mai",
-    contactRole: "Giám đốc điều hành",
-    contactPhone: "0923 456 789",
-    contactEmail: "mai.le@galaxyevents.vn",
-    activeOrders: 2,
-    totalWorkers: 15,
-    status: "active",
-  },
-  {
-    id: "4",
-    code: "KH-004",
-    name: "Kho vận Lazada Express",
-    industry: "Logistics",
-    address: "Quận 9, TP. Hồ Chí Minh",
-    contactName: "Phạm Đức Hùng",
-    contactRole: "Trưởng kho",
-    contactPhone: "0934 567 890",
-    contactEmail: "hung.pham@lazada.vn",
-    activeOrders: 4,
-    totalWorkers: 36,
-    status: "active",
-  },
-  {
-    id: "5",
-    code: "KH-005",
-    name: "Nhà hàng Hải Sản Biển Đông",
-    industry: "F&B",
-    address: "Quận 2, TP. Hồ Chí Minh",
-    contactName: "Hoàng Thị Lan",
-    contactRole: "Quản lý nhà hàng",
-    contactPhone: "0945 678 901",
-    contactEmail: "lan.hoang@biendong.vn",
-    activeOrders: 1,
-    totalWorkers: 8,
-    status: "paused",
-  },
-  {
-    id: "6",
-    code: "KH-006",
-    name: "Công ty TNHH May mặc Đại Phát",
-    industry: "Sản xuất",
-    address: "KCN Tân Bình, TP. HCM",
-    contactName: "Võ Quốc Bảo",
-    contactRole: "Giám đốc nhà máy",
-    contactPhone: "0956 789 012",
-    contactEmail: "bao.vo@daiphat.com",
-    activeOrders: 2,
-    totalWorkers: 20,
-    status: "active",
-  },
-  {
-    id: "7",
-    code: "KH-007",
-    name: "Công ty Tổ chức Tiệc cưới Hoàng Gia",
-    industry: "Sự kiện",
-    address: "Quận Bình Thạnh, TP. HCM",
-    contactName: "Đặng Thùy Dung",
-    contactRole: "Phó Giám đốc",
-    contactPhone: "0967 890 123",
-    contactEmail: "dung.dang@hoanggia.vn",
-    activeOrders: 1,
-    totalWorkers: 6,
-    status: "new",
-  },
-  {
-    id: "8",
-    code: "KH-008",
-    name: "Giao hàng Nhanh Express",
-    industry: "Logistics",
-    address: "Quận Tân Bình, TP. HCM",
-    contactName: "Bùi Văn Thắng",
-    contactRole: "Trưởng phòng Vận hành",
-    contactPhone: "0978 901 234",
-    contactEmail: "thang.bui@ghn.vn",
-    activeOrders: 3,
-    totalWorkers: 28,
-    status: "active",
-  },
-  {
-    id: "9",
-    code: "KH-009",
-    name: "Siêu thị Co.opmart Nguyễn Kiệm",
-    industry: "Khác",
-    address: "Quận Gò Vấp, TP. HCM",
-    contactName: "Trịnh Thanh Hà",
-    contactRole: "Quản lý cửa hàng",
-    contactPhone: "0989 012 345",
-    contactEmail: "ha.trinh@coopmart.vn",
-    activeOrders: 0,
-    totalWorkers: 0,
-    status: "new",
-  },
-  {
-    id: "10",
-    code: "KH-010",
-    name: "Công ty CP Xây dựng Hòa Bình",
-    industry: "Khác",
-    address: "Quận 3, TP. Hồ Chí Minh",
-    contactName: "Ngô Đình Nam",
-    contactRole: "Trưởng phòng Nhân sự",
-    contactPhone: "0990 123 456",
-    contactEmail: "nam.ngo@hoabinh.vn",
-    activeOrders: 1,
-    totalWorkers: 12,
-    status: "active",
-  },
-]
 
 // --- Helpers ---
 
 const industries = ["Tất cả", "Sản xuất", "F&B", "Sự kiện", "Logistics", "Khác"]
-const statuses = ["Tất cả", "Đang hợp tác", "Tạm dừng", "Mới"]
+
+const statusLabels = ["Tất cả", "Đang hợp tác", "Tiềm năng", "Ngừng hợp tác"] as const
+
+const statusLabelToValue: Record<string, string | undefined> = {
+  "Đang hợp tác": "active",
+  "Tiềm năng": "prospect",
+  "Ngừng hợp tác": "inactive",
+}
 
 const industryColors: Record<string, string> = {
   "Sản xuất": "bg-orange-50 text-orange-700 border-orange-200/80",
@@ -219,16 +85,10 @@ const industryColors: Record<string, string> = {
   "Khác": "bg-gray-50 text-gray-700 border-gray-200/80",
 }
 
-const statusConfig: Record<string, { label: string; className: string }> = {
+const statusConfig: Record<ClientStatus, { label: string; className: string }> = {
   active: { label: "Đang hợp tác", className: "bg-emerald-50 text-emerald-700 border-emerald-200/80" },
-  paused: { label: "Tạm dừng", className: "bg-amber-50 text-amber-700 border-amber-200/80" },
-  new: { label: "Mới", className: "bg-blue-50 text-blue-700 border-blue-200/80" },
-}
-
-const statusFilterMap: Record<string, string> = {
-  "Đang hợp tác": "active",
-  "Tạm dừng": "paused",
-  "Mới": "new",
+  inactive: { label: "Ngừng hợp tác", className: "bg-gray-50 text-gray-600 border-gray-200/80" },
+  prospect: { label: "Tiềm năng", className: "bg-blue-50 text-blue-700 border-blue-200/80" },
 }
 
 const avatarColors = [
@@ -260,33 +120,237 @@ function getInitials(name: string): string {
     .toUpperCase()
 }
 
+function formatAddress(client: Client): string {
+  return [client.address, client.district, client.city].filter(Boolean).join(", ")
+}
+
 // --- Stats ---
 
-const stats = [
-  { label: "Tổng khách hàng", value: "45", icon: Building2, color: "text-blue-600", bg: "bg-blue-50" },
-  { label: "Đang hợp tác", value: "28", icon: Users, color: "text-emerald-600", bg: "bg-emerald-50" },
-  { label: "YCTD tháng này", value: "12", icon: ShoppingCart, color: "text-violet-600", bg: "bg-violet-50" },
-  { label: "Doanh thu tháng", value: "850tr", icon: DollarSign, color: "text-amber-600", bg: "bg-amber-50" },
+const baseStats = [
+  { label: "Tổng khách hàng", icon: Building2, color: "text-blue-600", bg: "bg-blue-50", permission: "" },
+  { label: "Đang hợp tác", icon: Users, color: "text-emerald-600", bg: "bg-emerald-50", permission: "" },
+  { label: "YCTD tháng này", icon: ShoppingCart, color: "text-violet-600", bg: "bg-violet-50", permission: "" },
+  { label: "Doanh thu tháng", icon: DollarSign, color: "text-amber-600", bg: "bg-amber-50", permission: "revenue.view" },
 ]
+
+// --- Skeleton components ---
+
+function StatsSkeletons() {
+  return (
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <Card key={i} className="border-border/50 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-10 w-10 rounded-xl" />
+              <div className="space-y-1.5">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-5 w-12" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+function GridSkeletons() {
+  return (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <Card key={i} className="border-border/50 shadow-sm">
+          <CardContent className="p-5">
+            <div className="flex items-start gap-3.5">
+              <Skeleton className="h-12 w-12 rounded-xl" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            </div>
+            <div className="mt-4 flex gap-4">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+            <Skeleton className="mt-3 h-3 w-40" />
+            <div className="mt-4 border-t border-border/50 pt-3.5">
+              <Skeleton className="h-8 w-full" />
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+function TableSkeletons() {
+  return (
+    <Card className="border-border/50 shadow-sm">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Công ty</TableHead>
+            <TableHead>Ngành nghề</TableHead>
+            <TableHead className="text-center">Đơn hàng</TableHead>
+            <TableHead>Liên hệ</TableHead>
+            <TableHead>Trạng thái</TableHead>
+            <TableHead className="w-[80px]"></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <TableRow key={i}>
+              <TableCell>
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-8 w-8 rounded-lg" />
+                  <div className="space-y-1">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-3 w-32" />
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+              <TableCell className="text-center"><Skeleton className="mx-auto h-4 w-6" /></TableCell>
+              <TableCell>
+                <div className="space-y-1">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+              </TableCell>
+              <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+              <TableCell><Skeleton className="h-7 w-7" /></TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Card>
+  )
+}
+
+// --- Pagination ---
+
+function PaginationBar({
+  page,
+  lastPage,
+  total,
+  from,
+  to,
+  onPageChange,
+}: {
+  page: number
+  lastPage: number
+  total: number
+  from: number | null
+  to: number | null
+  onPageChange: (p: number) => void
+}) {
+  if (lastPage <= 1) return null
+
+  return (
+    <div className="flex items-center justify-between">
+      <p className="text-sm text-muted-foreground">
+        Hiển thị{" "}
+        <span className="font-medium text-foreground">{from ?? 0}</span> -{" "}
+        <span className="font-medium text-foreground">{to ?? 0}</span> / {total} khách hàng
+      </p>
+      <div className="flex items-center gap-1">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={page <= 1}
+          onClick={() => onPageChange(page - 1)}
+          className="gap-1"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Trước
+        </Button>
+        <span className="px-3 text-sm text-muted-foreground">
+          {page} / {lastPage}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={page >= lastPage}
+          onClick={() => onPageChange(page + 1)}
+          className="gap-1"
+        >
+          Sau
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// --- Main component ---
 
 export function ClientList() {
   const navigate = useNavigate()
+  const user = useAuthStore((s) => s.user)
+  const canCreateClient = hasPermission(user, "clients.create")
+  const canUpdateClient = hasPermission(user, "clients.update")
+  const canDeleteClient = hasPermission(user, "clients.delete")
+  const canViewRevenue = hasPermission(user, "revenue.view")
+
+  // Local UI state
   const [search, setSearch] = useState("")
   const [industryFilter, setIndustryFilter] = useState("Tất cả")
   const [statusFilter, setStatusFilter] = useState("Tất cả")
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const [page, setPage] = useState(1)
+  const [sortValue, setSortValue] = useState("-created_at")
+  const [deleteTarget, setDeleteTarget] = useState<Client | null>(null)
 
-  // Filter logic
-  const filtered = mockClients.filter((c) => {
-    const matchSearch =
-      !search ||
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.code.toLowerCase().includes(search.toLowerCase())
-    const matchIndustry = industryFilter === "Tất cả" || c.industry === industryFilter
-    const matchStatus =
-      statusFilter === "Tất cả" || c.status === statusFilterMap[statusFilter]
-    return matchSearch && matchIndustry && matchStatus
-  })
+  // Debounced search - reset page when filters change
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const handleSearchChange = useCallback((value: string) => {
+    setSearch(value)
+    setPage(1)
+    // Simple debounce using setTimeout
+    const timer = setTimeout(() => setDebouncedSearch(value), 400)
+    return () => clearTimeout(timer)
+  }, [])
+
+  // Build filter params for the API
+  const filters = useMemo<ClientFilter>(() => {
+    const f: ClientFilter = { page, per_page: viewMode === "grid" ? 12 : 20 }
+    if (debouncedSearch) f.search = debouncedSearch
+    const statusValue = statusLabelToValue[statusFilter]
+    if (statusValue) f.status = statusValue
+    if (industryFilter !== "Tất cả") f.industry = industryFilter
+    if (sortValue) f.sort = sortValue
+    return f
+  }, [page, debouncedSearch, statusFilter, industryFilter, viewMode, sortValue])
+
+  // API hooks
+  const { data, isLoading, isFetching } = useClients(filters)
+  const deleteMutation = useDeleteClient()
+
+  const clients = data?.data ?? []
+  const meta = data?.meta
+
+  // Compute summary stats from the response meta
+  const totalClients = meta?.total ?? 0
+
+  const handleDelete = () => {
+    if (!deleteTarget) return
+    deleteMutation.mutate(deleteTarget.id, {
+      onSuccess: () => {
+        setDeleteTarget(null)
+      },
+    })
+  }
+
+  const handleFilterChange = (type: "industry" | "status", value: string) => {
+    setPage(1)
+    if (type === "industry") setIndustryFilter(value)
+    else setStatusFilter(value)
+  }
+
+  const handleSortChange = (sort: string) => {
+    setSortValue(sort)
+    setPage(1)
+  }
 
   return (
     <div className="space-y-6">
@@ -296,35 +360,55 @@ export function ClientList() {
           <div className="flex items-center gap-2 mb-1">
             <Building2 className="h-5 w-5 text-primary" />
             <h1 className="text-xl font-semibold tracking-tight">Khách hàng</h1>
+            {isFetching && !isLoading && (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            )}
           </div>
           <p className="text-sm text-muted-foreground">
             Quản lý doanh nghiệp đối tác cung ứng nhân sự
           </p>
         </div>
-        <Button className="gap-1.5" onClick={() => toast.info("Tinh nang dang phat trien")}>
-          <Plus className="h-4 w-4" />
-          Thêm khách hàng
-        </Button>
+        {canCreateClient && (
+          <Button className="gap-1.5" onClick={() => navigate("/clients/create")}>
+            <Plus className="h-4 w-4" />
+            Thêm khách hàng
+          </Button>
+        )}
       </div>
 
       {/* Stats cards */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <Card key={stat.label} className="border-border/50 shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${stat.bg}`}>
-                  <stat.icon className={`h-5 w-5 ${stat.color}`} />
-                </div>
-                <div>
-                  <p className="text-[11px] text-muted-foreground">{stat.label}</p>
-                  <p className="text-lg font-bold tracking-tight">{stat.value}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {isLoading ? (
+        <StatsSkeletons />
+      ) : (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {baseStats
+            .filter((s) => !s.permission || hasPermission(user, s.permission))
+            .map((stat, idx) => {
+              // Derive stat values from API response
+              let value = "-"
+              if (idx === 0) value = String(totalClients)
+              else if (idx === 1) value = "-" // Would need a separate API call for active count
+              else if (idx === 2) value = "-"
+              else if (idx === 3) value = "-"
+
+              return (
+                <Card key={stat.label} className="border-border/50 shadow-sm">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${stat.bg}`}>
+                        <stat.icon className={`h-5 w-5 ${stat.color}`} />
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-muted-foreground">{stat.label}</p>
+                        <p className="text-lg font-bold tracking-tight">{value}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+        </div>
+      )}
 
       {/* Search + Filters */}
       <Card className="border-border/50 shadow-sm">
@@ -333,14 +417,14 @@ export function ClientList() {
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Tìm theo tên công ty, mã KH..."
+                placeholder="Tìm theo tên công ty..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="pl-9"
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Select value={industryFilter} onValueChange={setIndustryFilter}>
+              <Select value={industryFilter} onValueChange={(v) => handleFilterChange("industry", v)}>
                 <SelectTrigger className="w-[160px]">
                   <Building2 className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
                   <SelectValue placeholder="Ngành nghề" />
@@ -351,13 +435,13 @@ export function ClientList() {
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={(v) => handleFilterChange("status", v)}>
                 <SelectTrigger className="w-[160px]">
                   <TrendingUp className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
                   <SelectValue placeholder="Trạng thái" />
                 </SelectTrigger>
                 <SelectContent>
-                  {statuses.map((s) => (
+                  {statusLabels.map((s) => (
                     <SelectItem key={s} value={s}>{s}</SelectItem>
                   ))}
                 </SelectContent>
@@ -367,7 +451,7 @@ export function ClientList() {
                 <Button
                   variant={viewMode === "grid" ? "secondary" : "ghost"}
                   size="icon-xs"
-                  onClick={() => setViewMode("grid")}
+                  onClick={() => { setViewMode("grid"); setPage(1) }}
                   className="h-7 w-7"
                 >
                   <LayoutGrid className="h-3.5 w-3.5" />
@@ -375,7 +459,7 @@ export function ClientList() {
                 <Button
                   variant={viewMode === "list" ? "secondary" : "ghost"}
                   size="icon-xs"
-                  onClick={() => setViewMode("list")}
+                  onClick={() => { setViewMode("list"); setPage(1) }}
                   className="h-7 w-7"
                 >
                   <List className="h-3.5 w-3.5" />
@@ -387,16 +471,22 @@ export function ClientList() {
       </Card>
 
       {/* Results count */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          Hiển thị{" "}
-          <span className="font-medium text-foreground">{filtered.length}</span> /{" "}
-          <span className="font-medium text-foreground">{mockClients.length}</span> khách hàng
-        </p>
-      </div>
+      {!isLoading && meta && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Hiển thị{" "}
+            <span className="font-medium text-foreground">{meta.from ?? 0}</span> -{" "}
+            <span className="font-medium text-foreground">{meta.to ?? 0}</span> /{" "}
+            <span className="font-medium text-foreground">{meta.total}</span> khách hàng
+          </p>
+        </div>
+      )}
 
-      {/* Empty state */}
-      {filtered.length === 0 ? (
+      {/* Loading state */}
+      {isLoading ? (
+        viewMode === "grid" ? <GridSkeletons /> : <TableSkeletons />
+      ) : clients.length === 0 ? (
+        /* Empty state */
         <Card className="border-border/50 shadow-sm">
           <CardContent className="flex flex-col items-center justify-center py-16">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
@@ -411,11 +501,11 @@ export function ClientList() {
       ) : viewMode === "grid" ? (
         /* Grid view */
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((client) => {
+          {clients.map((client) => {
             const logoBg = getAvatarColor(client.id)
-            const initials = getInitials(client.name)
-            const indColor = industryColors[client.industry] ?? "bg-gray-50 text-gray-700 border-gray-200/80"
-            const stConfig = statusConfig[client.status]
+            const initials = getInitials(client.company_name)
+            const indColor = industryColors[client.industry ?? "Khác"] ?? "bg-gray-50 text-gray-700 border-gray-200/80"
+            const stConfig = statusConfig[client.status] ?? statusConfig.prospect
 
             return (
               <Card
@@ -433,23 +523,27 @@ export function ClientList() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <h3 className="text-[14px] font-semibold leading-snug truncate">
-                          {client.name}
+                          {client.company_name}
                         </h3>
                         <Badge
                           variant="outline"
                           className={`shrink-0 rounded-md text-[10px] font-medium ${stConfig.className}`}
                         >
-                          {stConfig.label}
+                          {client.status_label || stConfig.label}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-2 mt-1">
-                        <Badge
-                          variant="outline"
-                          className={`rounded-md text-[10px] font-medium ${indColor}`}
-                        >
-                          {client.industry}
-                        </Badge>
-                        <span className="text-[11px] text-muted-foreground">{client.code}</span>
+                        {client.industry && (
+                          <Badge
+                            variant="outline"
+                            className={`rounded-md text-[10px] font-medium ${indColor}`}
+                          >
+                            {client.industry}
+                          </Badge>
+                        )}
+                        {client.city && (
+                          <span className="text-[11px] text-muted-foreground">{client.city}</span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -459,24 +553,26 @@ export function ClientList() {
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <ShoppingCart className="h-3.5 w-3.5" />
                       <span>
-                        <span className="font-semibold text-foreground">{client.activeOrders}</span> đơn active
+                        <span className="font-semibold text-foreground">{client.staffing_orders_count ?? 0}</span> đơn hàng
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Users className="h-3.5 w-3.5" />
+                      <FileText className="h-3.5 w-3.5" />
                       <span>
-                        <span className="font-semibold text-foreground">{client.totalWorkers}</span> ứng viên
+                        <span className="font-semibold text-foreground">{client.contracts_count ?? 0}</span> hợp đồng
                       </span>
                     </div>
                   </div>
 
                   {/* Contact */}
-                  <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                    <Phone className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">
-                      {client.contactName} - {client.contactPhone}
-                    </span>
-                  </div>
+                  {(client.contact_name || client.contact_phone) && (
+                    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                      <Phone className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">
+                        {[client.contact_name, client.contact_phone].filter(Boolean).join(" - ")}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Actions */}
                   <div className="mt-4 flex items-center gap-2 border-t border-border/50 pt-3.5">
@@ -495,18 +591,29 @@ export function ClientList() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuGroup>
-                          <DropdownMenuItem onClick={() => toast.info("Tinh nang dang phat trien")}>
-                            <Pencil className="h-3.5 w-3.5 mr-2" />
-                            Chỉnh sửa
-                          </DropdownMenuItem>
+                          {canUpdateClient && (
+                            <DropdownMenuItem onClick={() => navigate(`/clients/${client.id}/edit`)}>
+                              <Pencil className="h-3.5 w-3.5 mr-2" />
+                              Chỉnh sửa
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem onClick={() => navigate("/orders/create")}>
                             <ShoppingCart className="h-3.5 w-3.5 mr-2" />
                             Tạo yêu cầu
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => toast.info("Tinh nang dang phat trien")}>
+                          <DropdownMenuItem onClick={() => navigate(`/clients/${client.id}`)}>
                             <FileText className="h-3.5 w-3.5 mr-2" />
                             Xem hợp đồng
                           </DropdownMenuItem>
+                          {canDeleteClient && (
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => setDeleteTarget(client)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 mr-2" />
+                              Xóa
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuGroup>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -522,28 +629,24 @@ export function ClientList() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[60px]">Mã KH</TableHead>
-                <TableHead>Công ty</TableHead>
-                <TableHead>Ngành nghề</TableHead>
-                <TableHead className="text-center">Yêu cầu TD</TableHead>
-                <TableHead className="text-center">Workers</TableHead>
+                <SortableHeader label="Công ty" field="company_name" currentSort={sortValue} onSort={handleSortChange} />
+                <SortableHeader label="Ngành nghề" field="industry" currentSort={sortValue} onSort={handleSortChange} />
+                <TableHead className="text-center">Đơn hàng</TableHead>
+                <TableHead className="text-center">Hợp đồng</TableHead>
                 <TableHead>Liên hệ</TableHead>
-                <TableHead>Trạng thái</TableHead>
+                <SortableHeader label="Trạng thái" field="status" currentSort={sortValue} onSort={handleSortChange} />
                 <TableHead className="w-[80px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((client) => {
+              {clients.map((client) => {
                 const logoBg = getAvatarColor(client.id)
-                const initials = getInitials(client.name)
-                const indColor = industryColors[client.industry] ?? "bg-gray-50 text-gray-700 border-gray-200/80"
-                const stConfig = statusConfig[client.status]
+                const initials = getInitials(client.company_name)
+                const indColor = industryColors[client.industry ?? "Khác"] ?? "bg-gray-50 text-gray-700 border-gray-200/80"
+                const stConfig = statusConfig[client.status] ?? statusConfig.prospect
 
                 return (
                   <TableRow key={client.id}>
-                    <TableCell className="text-xs text-muted-foreground font-mono">
-                      {client.code}
-                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div
@@ -556,30 +659,36 @@ export function ClientList() {
                             to={`/clients/${client.id}`}
                             className="text-sm font-medium hover:text-primary truncate block"
                           >
-                            {client.name}
+                            {client.company_name}
                           </Link>
-                          <p className="text-[11px] text-muted-foreground truncate">{client.address}</p>
+                          <p className="text-[11px] text-muted-foreground truncate">
+                            {formatAddress(client) || "-"}
+                          </p>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={`rounded-md text-[10px] font-medium ${indColor}`}>
-                        {client.industry}
-                      </Badge>
+                      {client.industry ? (
+                        <Badge variant="outline" className={`rounded-md text-[10px] font-medium ${indColor}`}>
+                          {client.industry}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-center">
-                      <span className="text-sm font-semibold">{client.activeOrders}</span>
+                      <span className="text-sm font-semibold">{client.staffing_orders_count ?? 0}</span>
                     </TableCell>
                     <TableCell className="text-center">
-                      <span className="text-sm font-semibold">{client.totalWorkers}</span>
+                      <span className="text-sm font-semibold">{client.contracts_count ?? 0}</span>
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm">{client.contactName}</div>
-                      <div className="text-[11px] text-muted-foreground">{client.contactPhone}</div>
+                      <div className="text-sm">{client.contact_name || "-"}</div>
+                      <div className="text-[11px] text-muted-foreground">{client.contact_phone || "-"}</div>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={`rounded-md text-[10px] font-medium ${stConfig.className}`}>
-                        {stConfig.label}
+                        {client.status_label || stConfig.label}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -593,14 +702,25 @@ export function ClientList() {
                               <Eye className="h-3.5 w-3.5 mr-2" />
                               Xem chi tiết
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => toast.info("Tinh nang dang phat trien")}>
-                              <Pencil className="h-3.5 w-3.5 mr-2" />
-                              Chỉnh sửa
-                            </DropdownMenuItem>
+                            {canUpdateClient && (
+                              <DropdownMenuItem onClick={() => navigate(`/clients/${client.id}/edit`)}>
+                                <Pencil className="h-3.5 w-3.5 mr-2" />
+                                Chỉnh sửa
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onClick={() => navigate("/orders/create")}>
                               <ShoppingCart className="h-3.5 w-3.5 mr-2" />
                               Tạo yêu cầu
                             </DropdownMenuItem>
+                            {canDeleteClient && (
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => setDeleteTarget(client)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                Xóa
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuGroup>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -612,6 +732,49 @@ export function ClientList() {
           </Table>
         </Card>
       )}
+
+      {/* Pagination */}
+      {!isLoading && meta && meta.last_page > 1 && (
+        <PaginationBar
+          page={meta.current_page}
+          lastPage={meta.last_page}
+          total={meta.total}
+          from={meta.from}
+          to={meta.to}
+          onPageChange={setPage}
+        />
+      )}
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xác nhận xóa khách hàng</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bạn có chắc chắn muốn xóa khách hàng{" "}
+              <span className="font-medium text-foreground">{deleteTarget?.company_name}</span>?
+              Hành động này không thể hoàn tác.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  Đang xóa...
+                </>
+              ) : (
+                "Xóa"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -16,7 +16,10 @@ import {
   ChevronsUpDown,
   UserCog,
   Shield,
-  User,
+  User as UserIcon,
+  Target,
+  DollarSign,
+  Wallet,
   type LucideIcon,
 } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -29,33 +32,46 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useAuthStore } from "@/stores/auth-store"
 import { useLogout } from "@/hooks/use-auth"
+import { hasPermission, type User } from "@/types/user"
 
 interface NavItem {
   title: string
   href: string
   icon: LucideIcon
   badge?: number
+  permission?: string // Permission required to see this item
 }
 
+// Vận hành - Operations
 const mainNav: NavItem[] = [
   { title: "Tổng quan", href: "/", icon: LayoutDashboard },
-  { title: "Yêu cầu tuyển dụng", href: "/orders", icon: ClipboardList },
-  { title: "Khách hàng", href: "/clients", icon: Building2 },
-  { title: "Ứng viên", href: "/workers", icon: Users },
-  { title: "Điều phối", href: "/dispatch", icon: Route },
-  { title: "Chấm công", href: "/attendance", icon: CalendarCheck },
+  { title: "Yêu cầu tuyển dụng", href: "/orders", icon: ClipboardList, permission: "orders.view" },
+  { title: "Khách hàng", href: "/clients", icon: Building2, permission: "clients.view" },
+  { title: "Ứng viên", href: "/workers", icon: Users, permission: "workers.view" },
+  { title: "Điều phối", href: "/dispatch", icon: Route, permission: "assignments.view" },
+  { title: "Chấm công", href: "/attendance", icon: CalendarCheck, permission: "attendance.view" },
 ]
 
+// Tài chính - Finance
 const financeNav: NavItem[] = [
-  { title: "Bảng lương", href: "/payroll", icon: Banknote },
-  { title: "Hóa đơn", href: "/invoices", icon: Receipt },
-  { title: "Báo cáo", href: "/reports", icon: BarChart3 },
+  { title: "Bảng lương Workers", href: "/payroll", icon: Banknote, permission: "payroll.view" },
+  { title: "Lương nhân viên", href: "/staff-payroll", icon: Wallet, permission: "staff_payroll.view" },
+  { title: "Hóa đơn", href: "/invoices", icon: Receipt, permission: "invoices.view" },
+  { title: "Doanh thu", href: "/revenue", icon: DollarSign, permission: "revenue.view" },
+  { title: "Báo cáo", href: "/reports", icon: BarChart3, permission: "reports.view" },
 ]
 
+// Quản lý - Management
+const managementNav: NavItem[] = [
+  { title: "KPI nhân viên", href: "/kpi", icon: Target, permission: "kpi.view" },
+  { title: "Cấu hình KPI", href: "/kpi/config", icon: Settings, permission: "kpi.config" },
+]
+
+// Hệ thống - System
 const systemNav: NavItem[] = [
-  { title: "Nhân sự nội bộ", href: "/staff", icon: UserCog },
-  { title: "Phân quyền", href: "/roles", icon: Shield },
-  { title: "Cài đặt", href: "/settings", icon: Settings },
+  { title: "Nhân sự nội bộ", href: "/staff", icon: UserCog, permission: "users.manage" },
+  { title: "Phân quyền", href: "/roles", icon: Shield, permission: "roles.manage" },
+  { title: "Cài đặt", href: "/settings", icon: Settings, permission: "settings.manage" },
 ]
 
 interface SidebarNavProps {
@@ -71,12 +87,31 @@ export function AppSidebar({ open = true, onClose }: SidebarNavProps) {
 
   const userName = user?.name ?? "Người dùng"
   const userInitials = userName.split(" ").map((w) => w[0]).join("").slice(-2).toUpperCase()
-  const userRole = user?.position ?? (user?.role === "admin" ? "Quản trị viên" : user?.role ?? "")
+  const userRole = user?.position ?? user?.roles?.[0]?.display_name ?? ""
+
+  const filterByPermission = (items: NavItem[]): NavItem[] =>
+    items.filter((item) => !item.permission || hasPermission(user, item.permission))
+
+  const renderNavSection = (label: string, items: NavItem[]) => {
+    const visible = filterByPermission(items)
+    if (visible.length === 0) return null
+    return (
+      <>
+        <div>
+          <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted-foreground">
+            {label}
+          </p>
+          <div className="space-y-0.5">
+            {visible.map(renderNavItem)}
+          </div>
+        </div>
+        <div className="mx-3 h-px bg-border/70" />
+      </>
+    )
+  }
 
   const renderNavItem = (item: NavItem) => {
-    const isActive = item.href === "/"
-      ? location.pathname === "/"
-      : location.pathname === item.href || location.pathname.startsWith(item.href + "/")
+    const isActive = location.pathname === item.href
     return (
       <Link
         key={item.href}
@@ -119,46 +154,20 @@ export function AppSidebar({ open = true, onClose }: SidebarNavProps) {
 
       <aside
         className={cn(
-          "fixed left-0 top-14 z-40 flex h-[calc(100vh-3.5rem)] w-[248px] flex-col border-r border-border/70 bg-sidebar transition-transform duration-200 ease-in-out md:sticky md:translate-x-0",
+          "fixed left-0 top-14 z-40 flex h-[calc(100vh-3.5rem)] w-[248px] flex-col border-r border-border/70 bg-sidebar transition-transform duration-200 ease-in-out md:relative md:top-0 md:h-full md:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full"
         )}
       >
         <nav className="flex-1 overflow-y-auto px-3 py-4">
           <div className="space-y-6">
-            <div>
-              <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted-foreground">
-                Quản lý
-              </p>
-              <div className="space-y-0.5">
-                {mainNav.map(renderNavItem)}
-              </div>
-            </div>
-
-            <div className="mx-3 h-px bg-border/70" />
-
-            <div>
-              <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted-foreground">
-                Tài chính
-              </p>
-              <div className="space-y-0.5">
-                {financeNav.map(renderNavItem)}
-              </div>
-            </div>
-
-            <div className="mx-3 h-px bg-border/70" />
-
-            <div>
-              <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted-foreground">
-                Hệ thống
-              </p>
-              <div className="space-y-0.5">
-                {systemNav.map(renderNavItem)}
-              </div>
-            </div>
+            {renderNavSection("Vận hành", mainNav)}
+            {renderNavSection("Tài chính", financeNav)}
+            {renderNavSection("Quản lý", managementNav)}
+            {renderNavSection("Hệ thống", systemNav)}
           </div>
         </nav>
 
-        <div className="border-t border-border/70 p-3">
+        <div className="shrink-0 border-t border-border/70 p-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent focus:outline-none">
@@ -181,7 +190,7 @@ export function AppSidebar({ open = true, onClose }: SidebarNavProps) {
               </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="cursor-pointer" onClick={() => navigate("/settings")}>
-                <User className="h-4 w-4" />
+                <UserIcon className="h-4 w-4" />
                 Thông tin cá nhân
               </DropdownMenuItem>
               <DropdownMenuItem className="cursor-pointer" onClick={() => navigate("/settings")}>

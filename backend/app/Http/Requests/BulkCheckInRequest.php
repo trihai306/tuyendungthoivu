@@ -33,12 +33,12 @@ class BulkCheckInRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'order_id.required' => 'Don hang la bat buoc.',
-            'order_id.exists' => 'Don hang khong ton tai.',
-            'date.required' => 'Ngay lam viec la bat buoc.',
-            'check_in.required' => 'Gio check-in la bat buoc.',
-            'records.required' => 'Danh sach cham cong la bat buoc.',
-            'records.min' => 'Can it nhat 1 ban ghi.',
+            'order_id.required' => 'Đơn hàng là bắt buộc.',
+            'order_id.exists' => 'Đơn hàng không tồn tại.',
+            'date.required' => 'Ngày làm việc là bắt buộc.',
+            'check_in.required' => 'Giờ check-in là bắt buộc.',
+            'records.required' => 'Danh sách chấm công là bắt buộc.',
+            'records.min' => 'Cần ít nhất 1 bản ghi.',
         ];
     }
 }

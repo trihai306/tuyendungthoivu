@@ -32,6 +32,17 @@ class UserResource extends JsonResource
             'department' => new DepartmentResource($this->whenLoaded('department')),
             'team' => new TeamResource($this->whenLoaded('team')),
             'roles' => RoleResource::collection($this->whenLoaded('roles')),
+            'permissions' => $this->when($this->relationLoaded('roles'), function () {
+                if ($this->roles->contains('name', 'super_admin')) {
+                    return \App\Models\Permission::pluck('name')->values();
+                }
+                return $this->roles->flatMap(function ($role) {
+                    return $role->permissions->pluck('name');
+                })->unique()->values();
+            }),
+            'highest_role_level' => $this->when($this->relationLoaded('roles'), function () {
+                return $this->roles->max('level') ?? 0;
+            }),
         ];
     }
 }

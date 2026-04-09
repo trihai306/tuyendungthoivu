@@ -38,11 +38,11 @@ class UpdateInvoiceRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'client_id.exists' => 'Khach hang khong ton tai.',
-            'period_end.after_or_equal' => 'Ngay ket thuc phai sau ngay bat dau.',
-            'items.*.description.required_with' => 'Mo ta hang muc la bat buoc.',
-            'items.*.quantity.required_with' => 'So luong la bat buoc.',
-            'items.*.unit_price.required_with' => 'Don gia la bat buoc.',
+            'client_id.exists' => 'Khách hàng không tồn tại.',
+            'period_end.after_or_equal' => 'Ngày kết thúc phải sau ngày bắt đầu.',
+            'items.*.description.required_with' => 'Mô tả hạng mục là bắt buộc.',
+            'items.*.quantity.required_with' => 'Số lượng là bắt buộc.',
+            'items.*.unit_price.required_with' => 'Đơn giá là bắt buộc.',
         ];
     }
 }

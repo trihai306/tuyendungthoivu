@@ -10,6 +10,7 @@ use App\Http\Resources\AssignmentResource;
 use App\Models\Assignment;
 use App\Models\StaffingOrder;
 use App\Models\Worker;
+use App\Traits\ScopesDataByRole;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\Log;
 
 class AssignmentController extends Controller
 {
+    use ScopesDataByRole;
     /**
      * Display a paginated list of assignments.
      * Supports filtering by order_id, worker_id, status.
@@ -25,6 +27,12 @@ class AssignmentController extends Controller
     {
         $query = Assignment::query()
             ->with(['order.client', 'worker', 'assignedBy']);
+
+        // Role-based data scoping: Recruiters see only their assignments
+        $user = $request->user();
+        if (!$this->isManagerOrAbove($user)) {
+            $query->where('assigned_by', $user->id);
+        }
 
         // Filter by order
         if ($request->filled('order_id')) {
@@ -84,7 +92,7 @@ class AssignmentController extends Controller
 
         return response()->json([
             'data' => new AssignmentResource($assignment),
-            'message' => 'Chi tiet phan cong',
+            'message' => 'Chi tiết phân công',
         ]);
     }
 
@@ -102,7 +110,7 @@ class AssignmentController extends Controller
         // Check if the order has available slots
         if ($order->quantity_filled >= $order->quantity_needed) {
             return response()->json([
-                'message' => 'Don hang da du nguoi, khong the phan cong them.',
+                'message' => 'Đơn hàng đã đủ người, không thể phân công thêm.',
             ], 422);
         }
 
@@ -114,7 +122,7 @@ class AssignmentController extends Controller
 
         if ($existingAssignment) {
             return response()->json([
-                'message' => 'Worker da duoc phan cong cho don hang nay.',
+                'message' => 'Worker đã được phân công cho đơn hàng này.',
             ], 422);
         }
 
@@ -135,7 +143,7 @@ class AssignmentController extends Controller
 
         return response()->json([
             'data' => new AssignmentResource($assignment->load(['order.client', 'worker', 'assignedBy'])),
-            'message' => 'Phan cong worker thanh cong',
+            'message' => 'Phân công worker thành công',
         ], 201);
     }
 
@@ -157,7 +165,7 @@ class AssignmentController extends Controller
         // Prevent updates on terminal assignments
         if ($assignment->status->isTerminal()) {
             return response()->json([
-                'message' => 'Khong the cap nhat phan cong da ket thuc.',
+                'message' => 'Không thể cập nhật phân công đã kết thúc.',
             ], 422);
         }
 
@@ -213,7 +221,7 @@ class AssignmentController extends Controller
 
         return response()->json([
             'data' => new AssignmentResource($assignment->fresh()->load(['order.client', 'worker', 'assignedBy'])),
-            'message' => 'Cap nhat trang thai phan cong thanh cong',
+            'message' => 'Cập nhật trạng thái phân công thành công',
         ]);
     }
 
@@ -237,7 +245,7 @@ class AssignmentController extends Controller
         $remainingSlots = $order->quantity_needed - $order->quantity_filled;
         if (count($workerIds) > $remainingSlots) {
             return response()->json([
-                'message' => "Don hang chi con {$remainingSlots} vi tri trong. Khong the phan cong " . count($workerIds) . ' worker.',
+                'message' => "Đơn hàng chỉ còn {$remainingSlots} vị trí trống. Không thể phân công " . count($workerIds) . ' worker.',
             ], 422);
         }
 
@@ -253,8 +261,8 @@ class AssignmentController extends Controller
                     $errors[] = [
                         'worker_id' => $workerId,
                         'message' => $worker
-                            ? "Worker {$worker->full_name} khong san sang (trang thai: {$worker->status->label()})."
-                            : 'Worker khong ton tai.',
+                            ? "Worker {$worker->full_name} không sẵn sàng (trạng thái: {$worker->status->label()})."
+                            : 'Worker không tồn tại.',
                     ];
                     continue;
                 }
@@ -268,7 +276,7 @@ class AssignmentController extends Controller
                 if ($exists) {
                     $errors[] = [
                         'worker_id' => $workerId,
-                        'message' => "Worker {$worker->full_name} da duoc phan cong cho don hang nay.",
+                        'message' => "Worker {$worker->full_name} đã được phân công cho đơn hàng này.",
                     ];
                     continue;
                 }
@@ -292,7 +300,7 @@ class AssignmentController extends Controller
             'data' => AssignmentResource::collection(
                 collect($assignments['created'])->map(fn ($a) => $a->load(['worker', 'assignedBy']))
             ),
-            'message' => 'Phan cong hang loat thanh cong. Da phan cong ' . count($assignments['created']) . ' worker.',
+            'message' => 'Phân công hàng loạt thành công. Đã phân công ' . count($assignments['created']) . ' worker.',
         ];
 
         if (!empty($assignments['errors'])) {
@@ -312,7 +320,7 @@ class AssignmentController extends Controller
         // Can only remove active assignments
         if ($assignment->status->isTerminal()) {
             return response()->json([
-                'message' => 'Khong the huy phan cong da ket thuc.',
+                'message' => 'Không thể hủy phân công đã kết thúc.',
             ], 422);
         }
 
@@ -339,7 +347,7 @@ class AssignmentController extends Controller
         });
 
         return response()->json([
-            'message' => 'Huy phan cong thanh cong',
+            'message' => 'Hủy phân công thành công',
         ]);
     }
 }

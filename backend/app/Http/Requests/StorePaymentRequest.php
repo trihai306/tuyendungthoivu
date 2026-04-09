@@ -35,13 +35,13 @@ class StorePaymentRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'payable_type.required' => 'Loai thanh toan la bat buoc.',
-            'payable_type.in' => 'Loai thanh toan phai la invoice hoac payroll.',
-            'payable_id.required' => 'ID doi tuong thanh toan la bat buoc.',
-            'amount.required' => 'So tien la bat buoc.',
-            'amount.min' => 'So tien phai lon hon 0.',
-            'payment_method.required' => 'Phuong thuc thanh toan la bat buoc.',
-            'payment_date.required' => 'Ngay thanh toan la bat buoc.',
+            'payable_type.required' => 'Loại thanh toán là bắt buộc.',
+            'payable_type.in' => 'Loại thanh toán phải là invoice hoặc payroll.',
+            'payable_id.required' => 'ID đối tượng thanh toán là bắt buộc.',
+            'amount.required' => 'Số tiền là bắt buộc.',
+            'amount.min' => 'Số tiền phải lớn hơn 0.',
+            'payment_method.required' => 'Phương thức thanh toán là bắt buộc.',
+            'payment_date.required' => 'Ngày thanh toán là bắt buộc.',
         ];
     }
 }

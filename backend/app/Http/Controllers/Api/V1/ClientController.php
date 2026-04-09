@@ -7,11 +7,13 @@ use App\Http\Requests\StoreClientRequest;
 use App\Http\Requests\UpdateClientRequest;
 use App\Http\Resources\ClientResource;
 use App\Models\Client;
+use App\Traits\ScopesDataByRole;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ClientController extends Controller
 {
+    use ScopesDataByRole;
     /**
      * Display a paginated list of clients.
      * Supports filtering by status, industry, city, and search.
@@ -20,6 +22,15 @@ class ClientController extends Controller
     {
         $query = Client::query()
             ->withCount(['staffingOrders', 'contracts']);
+
+        // Role-based scoping: Recruiter only sees clients with orders assigned to them
+        $user = $request->user();
+        if (!$this->isManagerOrAbove($user)) {
+            $query->whereHas('staffingOrders', function ($q) use ($user) {
+                $q->where('assigned_recruiter_id', $user->id)
+                  ->orWhere('created_by', $user->id);
+            });
+        }
 
         // Search by company_name, contact_name, contact_phone
         if ($request->filled('search')) {
@@ -80,7 +91,7 @@ class ClientController extends Controller
 
         return response()->json([
             'data' => new ClientResource($client),
-            'message' => 'Chi tiet khach hang',
+            'message' => 'Chi tiết khách hàng',
         ]);
     }
 
@@ -96,7 +107,7 @@ class ClientController extends Controller
 
         return response()->json([
             'data' => new ClientResource($client),
-            'message' => 'Tao khach hang thanh cong',
+            'message' => 'Tạo khách hàng thành công',
         ], 201);
     }
 
@@ -111,7 +122,7 @@ class ClientController extends Controller
 
         return response()->json([
             'data' => new ClientResource($client->fresh()),
-            'message' => 'Cap nhat khach hang thanh cong',
+            'message' => 'Cập nhật khách hàng thành công',
         ]);
     }
 
@@ -129,14 +140,14 @@ class ClientController extends Controller
 
         if ($activeOrdersCount > 0) {
             return response()->json([
-                'message' => 'Khong the xoa khach hang dang co don hang hoat dong.',
+                'message' => 'Không thể xóa khách hàng đang có đơn hàng hoạt động.',
             ], 422);
         }
 
         $client->delete();
 
         return response()->json([
-            'message' => 'Xoa khach hang thanh cong',
+            'message' => 'Xóa khách hàng thành công',
         ]);
     }
 }

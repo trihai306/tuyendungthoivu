@@ -59,7 +59,7 @@ class AttendanceNewController extends Controller
             ->paginate($perPage);
 
         return AttendanceNewResource::collection($records)
-            ->additional(['message' => 'Danh sach cham cong'])
+            ->additional(['message' => 'Danh sách chấm công'])
             ->response();
     }
 
@@ -79,7 +79,7 @@ class AttendanceNewController extends Controller
 
         if ($existing) {
             return response()->json([
-                'message' => 'Da co ban ghi cham cong cho ngay nay.',
+                'message' => 'Đã có bản ghi chấm công cho ngày này.',
                 'data' => new AttendanceNewResource($existing->load(['worker', 'order.client'])),
             ], 422);
         }
@@ -111,7 +111,7 @@ class AttendanceNewController extends Controller
 
         return response()->json([
             'data' => new AttendanceNewResource($record),
-            'message' => 'Check-in thanh cong.',
+            'message' => 'Check-in thành công.',
         ], 201);
     }
 
@@ -127,7 +127,7 @@ class AttendanceNewController extends Controller
 
         if ($record->check_out_time) {
             return response()->json([
-                'message' => 'Da check-out truoc do.',
+                'message' => 'Đã check-out trước đó.',
                 'data' => new AttendanceNewResource($record),
             ], 422);
         }
@@ -170,7 +170,7 @@ class AttendanceNewController extends Controller
 
         return response()->json([
             'data' => new AttendanceNewResource($record->fresh(['worker', 'order.client'])),
-            'message' => 'Check-out thanh cong.',
+            'message' => 'Check-out thành công.',
         ]);
     }
 
@@ -192,7 +192,7 @@ class AttendanceNewController extends Controller
                 if (!$assignment) {
                     $errors[] = [
                         'assignment_id' => $record['assignment_id'],
-                        'error' => 'Phan cong khong ton tai.',
+                        'error' => 'Phân công không tồn tại.',
                     ];
                     continue;
                 }
@@ -205,7 +205,7 @@ class AttendanceNewController extends Controller
                 if ($existing) {
                     $errors[] = [
                         'assignment_id' => $record['assignment_id'],
-                        'error' => 'Da co ban ghi cham cong.',
+                        'error' => 'Đã có bản ghi chấm công.',
                     ];
                     continue;
                 }
@@ -236,7 +236,7 @@ class AttendanceNewController extends Controller
         return response()->json([
             'data' => AttendanceNewResource::collection($loadedRecords),
             'errors' => $errors,
-            'message' => sprintf('Da tao %d ban ghi cham cong.', count($created)),
+            'message' => sprintf('Đã tạo %d bản ghi chấm công.', count($created)),
         ], 201);
     }
 
@@ -271,7 +271,7 @@ class AttendanceNewController extends Controller
                 'summary' => $summary,
                 'records' => AttendanceNewResource::collection($records),
             ],
-            'message' => 'Bao cao cham cong ngay.',
+            'message' => 'Báo cáo chấm công ngày.',
         ]);
     }
 
@@ -323,7 +323,7 @@ class AttendanceNewController extends Controller
                 'totals' => $totals,
                 'daily_summary' => $dailySummary,
             ],
-            'message' => 'Bao cao cham cong tuan.',
+            'message' => 'Báo cáo chấm công tuần.',
         ]);
     }
 
@@ -361,7 +361,7 @@ class AttendanceNewController extends Controller
                 'summary' => $summary,
                 'records' => AttendanceNewResource::collection($records),
             ],
-            'message' => 'Bao cao cham cong thang.',
+            'message' => 'Báo cáo chấm công tháng.',
         ]);
     }
 
@@ -374,7 +374,7 @@ class AttendanceNewController extends Controller
 
         if ($attendance->is_approved) {
             return response()->json([
-                'message' => 'Ban ghi cham cong da duoc phe duyet truoc do.',
+                'message' => 'Bản ghi chấm công đã được phê duyệt trước đó.',
             ], 422);
         }
 
@@ -386,7 +386,7 @@ class AttendanceNewController extends Controller
 
         return response()->json([
             'data' => new AttendanceNewResource($attendance->fresh(['worker', 'order.client', 'approvedBy'])),
-            'message' => 'Da phe duyet cham cong.',
+            'message' => 'Đã phê duyệt chấm công.',
         ]);
     }
 
@@ -410,7 +410,7 @@ class AttendanceNewController extends Controller
 
         return response()->json([
             'data' => ['approved_count' => $approvedCount],
-            'message' => sprintf('Da phe duyet %d ban ghi cham cong.', $approvedCount),
+            'message' => sprintf('Đã phê duyệt %d bản ghi chấm công.', $approvedCount),
         ]);
     }
 }

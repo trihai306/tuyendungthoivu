@@ -60,7 +60,7 @@ class PayrollNewController extends Controller
             ->paginate($perPage);
 
         return PayrollNewResource::collection($records)
-            ->additional(['message' => 'Danh sach bang luong'])
+            ->additional(['message' => 'Danh sách bảng lương'])
             ->response();
     }
 
@@ -74,7 +74,7 @@ class PayrollNewController extends Controller
 
         return response()->json([
             'data' => new PayrollNewResource($payroll),
-            'message' => 'Chi tiet phieu luong.',
+            'message' => 'Chi tiết phiếu lương.',
         ]);
     }
 
@@ -108,7 +108,7 @@ class PayrollNewController extends Controller
 
         if ($existing->exists()) {
             return response()->json([
-                'message' => 'Da ton tai phieu luong cho ky nay. Vui long xoa phieu cu truoc.',
+                'message' => 'Đã tồn tại phiếu lương cho kỳ này. Vui lòng xóa phiếu cũ trước.',
             ], 422);
         }
 
@@ -125,7 +125,7 @@ class PayrollNewController extends Controller
 
         if ($attendances->isEmpty()) {
             return response()->json([
-                'message' => 'Khong co du lieu cham cong cho ky nay.',
+                'message' => 'Không có dữ liệu chấm công cho kỳ này.',
             ], 422);
         }
 
@@ -185,7 +185,7 @@ class PayrollNewController extends Controller
 
         return response()->json([
             'data' => new PayrollNewResource($payroll),
-            'message' => 'Tinh luong thanh cong.',
+            'message' => 'Tính lương thành công.',
         ], 201);
     }
 
@@ -305,7 +305,7 @@ class PayrollNewController extends Controller
                 'skipped' => $skipped,
                 'errors' => $errors,
             ],
-            'message' => sprintf('Da tinh luong cho %d workers. Bo qua %d.', $created, $skipped),
+            'message' => sprintf('Đã tính lương cho %d workers. Bỏ qua %d.', $created, $skipped),
         ], 201);
     }
 
@@ -318,7 +318,7 @@ class PayrollNewController extends Controller
 
         if ($payroll->status !== PayrollStatus::Draft) {
             return response()->json([
-                'message' => 'Chi co the kiem tra phieu luong o trang thai nhap.',
+                'message' => 'Chỉ có thể kiểm tra phiếu lương ở trạng thái nháp.',
             ], 422);
         }
 
@@ -332,7 +332,7 @@ class PayrollNewController extends Controller
 
         return response()->json([
             'data' => new PayrollNewResource($payroll),
-            'message' => 'Kiem tra phieu luong thanh cong.',
+            'message' => 'Kiểm tra phiếu lương thành công.',
         ]);
     }
 
@@ -345,7 +345,7 @@ class PayrollNewController extends Controller
 
         if (!in_array($payroll->status, [PayrollStatus::Draft, PayrollStatus::Reviewed])) {
             return response()->json([
-                'message' => 'Chi co the duyet phieu luong o trang thai nhap hoac da kiem tra.',
+                'message' => 'Chỉ có thể duyệt phiếu lương ở trạng thái nháp hoặc đã kiểm tra.',
             ], 422);
         }
 
@@ -359,7 +359,7 @@ class PayrollNewController extends Controller
 
         return response()->json([
             'data' => new PayrollNewResource($payroll),
-            'message' => 'Duyet phieu luong thanh cong.',
+            'message' => 'Duyệt phiếu lương thành công.',
         ]);
     }
 
@@ -377,7 +377,7 @@ class PayrollNewController extends Controller
 
         if ($payroll->status !== PayrollStatus::Approved) {
             return response()->json([
-                'message' => 'Chi co the thanh toan phieu luong da duyet.',
+                'message' => 'Chỉ có thể thanh toán phiếu lương đã duyệt.',
             ], 422);
         }
 
@@ -392,7 +392,7 @@ class PayrollNewController extends Controller
 
         return response()->json([
             'data' => new PayrollNewResource($payroll),
-            'message' => 'Thanh toan luong thanh cong.',
+            'message' => 'Thanh toán lương thành công.',
         ]);
     }
 
@@ -413,7 +413,7 @@ class PayrollNewController extends Controller
 
         if ($payrolls->isEmpty()) {
             return response()->json([
-                'message' => 'Khong co phieu luong nao du dieu kien thanh toan.',
+                'message' => 'Không có phiếu lương nào đủ điều kiện thanh toán.',
             ], 422);
         }
 
@@ -432,7 +432,7 @@ class PayrollNewController extends Controller
 
         return response()->json([
             'data' => ['paid_count' => $paidCount],
-            'message' => sprintf('Da thanh toan %d phieu luong.', $paidCount),
+            'message' => sprintf('Đã thanh toán %d phiếu lương.', $paidCount),
         ]);
     }
 
@@ -474,7 +474,7 @@ class PayrollNewController extends Controller
                 'summary' => $summary,
                 'records' => PayrollNewResource::collection($records),
             ],
-            'message' => 'Du lieu xuat bang luong.',
+            'message' => 'Dữ liệu xuất bảng lương.',
         ]);
     }
 }

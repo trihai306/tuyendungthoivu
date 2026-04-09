@@ -51,7 +51,7 @@ class PaymentController extends Controller
             ->paginate($perPage);
 
         return PaymentResource::collection($records)
-            ->additional(['message' => 'Lich su thanh toan'])
+            ->additional(['message' => 'Lịch sử thanh toán'])
             ->response();
     }
 
@@ -71,7 +71,7 @@ class PaymentController extends Controller
 
         if (!$payable) {
             return response()->json([
-                'message' => 'Doi tuong thanh toan khong ton tai.',
+                'message' => 'Đối tượng thanh toán không tồn tại.',
             ], 404);
         }
 
@@ -106,7 +106,7 @@ class PaymentController extends Controller
 
         return response()->json([
             'data' => new PaymentResource($payment),
-            'message' => 'Ghi nhan thanh toan thanh cong.',
+            'message' => 'Ghi nhận thanh toán thành công.',
         ], 201);
     }
 }

@@ -1,5 +1,13 @@
-import { useState } from "react"
+import { useState, useMemo, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
+import { usePermissions } from "@/hooks/use-permissions"
+import {
+  useStaffingOrders,
+  useUpdateOrderStatus,
+  useDeleteStaffingOrder,
+} from "@/hooks/use-staffing-orders"
+import type { StaffingOrder, OrderStatus, OrderUrgency } from "@/types/staffing"
+import type { StaffingOrderFilter } from "@/services/staffing-orders.service"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -52,6 +60,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { SortableHeader } from "@/components/ui/sortable-header"
+import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import {
   Plus,
@@ -61,10 +71,8 @@ import {
   Pencil,
   Users,
   XCircle,
-  ClipboardList,
   Sparkles,
   FileSearch,
-  CalendarDays,
   Download,
   Copy,
   Printer,
@@ -73,43 +81,39 @@ import {
   RefreshCw,
   X,
   AlertTriangle,
+  Loader2,
 } from "lucide-react"
-
-// ─── Types ──────────────────────────────────────────────────────────────────
-
-type OrderStatus = "new" | "processing" | "dispatched" | "completed" | "cancelled"
-type UrgencyLevel = "normal" | "urgent" | "critical"
-type ServiceType = "short_term" | "long_term" | "shift_based" | "project_based"
-
-interface Order {
-  id: string
-  code: string
-  client_name: string
-  client_avatar_color: string
-  position: string
-  quantity_needed: number
-  quantity_filled: number
-  status: OrderStatus
-  urgency: UrgencyLevel
-  service_type: ServiceType
-  start_date: string
-  created_at: string
-}
 
 // ─── Config ─────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string; className: string }> = {
-  new: {
-    label: "Mới",
+  draft: {
+    label: "Nháp",
+    className: "bg-gray-50 text-gray-600 border-gray-200/80 dark:bg-gray-500/10 dark:text-gray-400 dark:border-gray-500/20",
+  },
+  pending: {
+    label: "Chờ duyệt",
+    className: "bg-yellow-50 text-yellow-700 border-yellow-200/80 dark:bg-yellow-500/10 dark:text-yellow-400 dark:border-yellow-500/20",
+  },
+  approved: {
+    label: "Đã duyệt",
     className: "bg-blue-50 text-blue-700 border-blue-200/80 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20",
   },
-  processing: {
-    label: "Đang xử lý",
+  rejected: {
+    label: "Từ chối",
+    className: "bg-red-50 text-red-700 border-red-200/80 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20",
+  },
+  recruiting: {
+    label: "Đang tuyển",
     className: "bg-amber-50 text-amber-700 border-amber-200/80 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20",
   },
-  dispatched: {
-    label: "Đã điều phối",
+  filled: {
+    label: "Đã đủ người",
     className: "bg-emerald-50 text-emerald-700 border-emerald-200/80 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20",
+  },
+  in_progress: {
+    label: "Đang thực hiện",
+    className: "bg-indigo-50 text-indigo-700 border-indigo-200/80 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20",
   },
   completed: {
     label: "Hoàn thành",
@@ -121,7 +125,7 @@ const STATUS_CONFIG: Record<OrderStatus, { label: string; className: string }> =
   },
 }
 
-const URGENCY_CONFIG: Record<UrgencyLevel, { label: string; className: string }> = {
+const URGENCY_CONFIG: Record<OrderUrgency, { label: string; className: string }> = {
   normal: {
     label: "Bình thường",
     className: "bg-gray-100 text-gray-600 border-gray-200/80",
@@ -136,18 +140,18 @@ const URGENCY_CONFIG: Record<UrgencyLevel, { label: string; className: string }>
   },
 }
 
-const STATUS_TABS: { value: string; label: string; count: number }[] = [
-  { value: "all", label: "Tất cả", count: 10 },
-  { value: "new", label: "Mới", count: 3 },
-  { value: "processing", label: "Đang xử lý", count: 3 },
-  { value: "dispatched", label: "Đã điều phối", count: 2 },
-  { value: "completed", label: "Hoàn thành", count: 1 },
-  { value: "cancelled", label: "Đã hủy", count: 1 },
+const STATUS_TABS: { value: string; label: string }[] = [
+  { value: "all", label: "Tất cả" },
+  { value: "draft", label: "Nháp" },
+  { value: "pending", label: "Chờ duyệt" },
+  { value: "approved", label: "Đã duyệt" },
+  { value: "recruiting", label: "Đang tuyển" },
+  { value: "in_progress", label: "Đang thực hiện" },
+  { value: "completed", label: "Hoàn thành" },
+  { value: "cancelled", label: "Đã hủy" },
 ]
 
 const PER_PAGE_OPTIONS = [10, 25, 50] as const
-
-// ─── Mock Data ──────────────────────────────────────────────────────────────
 
 const AVATAR_COLORS = [
   "from-blue-400 to-blue-600",
@@ -162,149 +166,6 @@ const AVATAR_COLORS = [
   "from-orange-400 to-orange-600",
 ]
 
-const MOCK_ORDERS: Order[] = [
-  {
-    id: "1",
-    code: "ORD-2024-001",
-    client_name: "Công ty TNHH Thực phẩm Vạn Phúc",
-    client_avatar_color: AVATAR_COLORS[0],
-    position: "Công nhân đóng gói",
-    quantity_needed: 20,
-    quantity_filled: 15,
-    status: "processing",
-    urgency: "urgent",
-    service_type: "short_term",
-    start_date: "2024-04-15",
-    created_at: "2024-04-01",
-  },
-  {
-    id: "2",
-    code: "ORD-2024-002",
-    client_name: "Nhà hàng Hoàng Long",
-    client_avatar_color: AVATAR_COLORS[1],
-    position: "Phục vụ nhà hàng",
-    quantity_needed: 10,
-    quantity_filled: 10,
-    status: "dispatched",
-    urgency: "normal",
-    service_type: "shift_based",
-    start_date: "2024-04-10",
-    created_at: "2024-03-28",
-  },
-  {
-    id: "3",
-    code: "ORD-2024-003",
-    client_name: "Kho vận Tân Cảng",
-    client_avatar_color: AVATAR_COLORS[2],
-    position: "Bốc xếp kho",
-    quantity_needed: 30,
-    quantity_filled: 8,
-    status: "new",
-    urgency: "critical",
-    service_type: "short_term",
-    start_date: "2024-04-12",
-    created_at: "2024-04-05",
-  },
-  {
-    id: "4",
-    code: "ORD-2024-004",
-    client_name: "Công ty CP May Sài Gòn 3",
-    client_avatar_color: AVATAR_COLORS[3],
-    position: "Công nhân may",
-    quantity_needed: 50,
-    quantity_filled: 42,
-    status: "processing",
-    urgency: "normal",
-    service_type: "long_term",
-    start_date: "2024-04-20",
-    created_at: "2024-03-25",
-  },
-  {
-    id: "5",
-    code: "ORD-2024-005",
-    client_name: "Siêu thị BigC Thăng Long",
-    client_avatar_color: AVATAR_COLORS[4],
-    position: "Nhân viên bán hàng",
-    quantity_needed: 15,
-    quantity_filled: 0,
-    status: "new",
-    urgency: "urgent",
-    service_type: "shift_based",
-    start_date: "2024-04-18",
-    created_at: "2024-04-06",
-  },
-  {
-    id: "6",
-    code: "ORD-2024-006",
-    client_name: "Khách sạn Mường Thanh Luxury",
-    client_avatar_color: AVATAR_COLORS[5],
-    position: "Nhân viên buồng phòng",
-    quantity_needed: 8,
-    quantity_filled: 8,
-    status: "completed",
-    urgency: "normal",
-    service_type: "project_based",
-    start_date: "2024-03-01",
-    created_at: "2024-02-20",
-  },
-  {
-    id: "7",
-    code: "ORD-2024-007",
-    client_name: "Nhà máy Samsung SEVT",
-    client_avatar_color: AVATAR_COLORS[6],
-    position: "Công nhân lắp ráp",
-    quantity_needed: 100,
-    quantity_filled: 65,
-    status: "processing",
-    urgency: "urgent",
-    service_type: "long_term",
-    start_date: "2024-05-01",
-    created_at: "2024-04-02",
-  },
-  {
-    id: "8",
-    code: "ORD-2024-008",
-    client_name: "Công ty TNHH Logistics Gemadept",
-    client_avatar_color: AVATAR_COLORS[7],
-    position: "Lái xe nâng",
-    quantity_needed: 5,
-    quantity_filled: 0,
-    status: "cancelled",
-    urgency: "normal",
-    service_type: "short_term",
-    start_date: "2024-04-08",
-    created_at: "2024-03-30",
-  },
-  {
-    id: "9",
-    code: "ORD-2024-009",
-    client_name: "Trung tâm Hội nghị GEM Center",
-    client_avatar_color: AVATAR_COLORS[8],
-    position: "Nhân viên sự kiện",
-    quantity_needed: 25,
-    quantity_filled: 0,
-    status: "new",
-    urgency: "critical",
-    service_type: "project_based",
-    start_date: "2024-04-20",
-    created_at: "2024-04-07",
-  },
-  {
-    id: "10",
-    code: "ORD-2024-010",
-    client_name: "Công ty CP Xây dựng Hòa Bình",
-    client_avatar_color: AVATAR_COLORS[9],
-    position: "Thợ hồ & phụ hồ",
-    quantity_needed: 40,
-    quantity_filled: 32,
-    status: "dispatched",
-    urgency: "normal",
-    service_type: "project_based",
-    start_date: "2024-04-10",
-    created_at: "2024-03-20",
-  },
-]
-
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function getInitials(name: string): string {
@@ -316,17 +177,22 @@ function getInitials(name: string): string {
     .toUpperCase()
 }
 
-function formatDate(dateStr: string): string {
+function getAvatarColor(id: string): string {
+  // Deterministic color from the id string
+  let hash = 0
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash * 31 + id.charCodeAt(i)) | 0
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
+}
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "—"
   return new Intl.DateTimeFormat("vi-VN", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
   }).format(new Date(dateStr))
-}
-
-function getProgressPercent(filled: number, needed: number): number {
-  if (needed === 0) return 0
-  return Math.min(Math.round((filled / needed) * 100), 100)
 }
 
 function getProgressColor(percent: number): string {
@@ -339,7 +205,7 @@ function getProgressColor(percent: number): string {
 // ─── Sub-components ─────────────────────────────────────────────────────────
 
 function ProgressBar({ filled, needed }: { filled: number; needed: number }) {
-  const percent = getProgressPercent(filled, needed)
+  const percent = needed === 0 ? 0 : Math.min(Math.round((filled / needed) * 100), 100)
   const color = getProgressColor(percent)
   return (
     <div className="flex items-center gap-2.5">
@@ -372,47 +238,115 @@ function EmptyState() {
   )
 }
 
+function TableSkeleton() {
+  return (
+    <Card className="border-border/50 shadow-sm overflow-hidden">
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[44px] pl-4"><Skeleton className="h-4 w-4" /></TableHead>
+              <TableHead className="w-[120px]"><Skeleton className="h-4 w-20" /></TableHead>
+              <TableHead className="min-w-[160px]"><Skeleton className="h-4 w-24" /></TableHead>
+              <TableHead><Skeleton className="h-4 w-20" /></TableHead>
+              <TableHead className="w-[120px]"><Skeleton className="h-4 w-16" /></TableHead>
+              <TableHead className="w-[100px]"><Skeleton className="h-4 w-16" /></TableHead>
+              <TableHead className="w-[90px]"><Skeleton className="h-4 w-14" /></TableHead>
+              <TableHead className="w-[44px]" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <TableRow key={i}>
+                <TableCell className="pl-4"><Skeleton className="h-4 w-4" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2.5">
+                    <Skeleton className="h-8 w-8 rounded-lg" />
+                    <Skeleton className="h-4 w-32" />
+                  </div>
+                </TableCell>
+                <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                <TableCell><Skeleton className="h-5 w-16 rounded-md" /></TableCell>
+                <TableCell><Skeleton className="h-5 w-14 rounded-md" /></TableCell>
+                <TableCell><Skeleton className="h-7 w-7 rounded-md" /></TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </Card>
+  )
+}
+
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 export function OrderList() {
   const navigate = useNavigate()
-  const [orders, setOrders] = useState<Order[]>(MOCK_ORDERS)
+  const can = usePermissions()
+
+  // ─── Filter / pagination state ────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const [searchTimer, setSearchTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
   const [statusFilter, setStatusFilter] = useState("all")
   const [urgencyFilter, setUrgencyFilter] = useState("")
   const [serviceFilter, setServiceFilter] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [perPage, setPerPage] = useState<number>(10)
+  const [sortValue, setSortValue] = useState("-created_at")
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  // Sort change handler - also resets page to 1
+  const handleSort = useCallback((sort: string) => {
+    setSortValue(sort)
+    setCurrentPage(1)
+  }, [])
 
   // Cancel confirmation dialog
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
   const [cancelTarget, setCancelTarget] = useState<{ ids: string[]; label: string } | null>(null)
 
-  // Filter data
-  const filtered = orders.filter((order) => {
-    if (statusFilter !== "all" && order.status !== statusFilter) return false
-    if (urgencyFilter && urgencyFilter !== "all" && order.urgency !== urgencyFilter) return false
-    if (serviceFilter && serviceFilter !== "all" && order.service_type !== serviceFilter) return false
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase()
-      if (
-        !order.code.toLowerCase().includes(q) &&
-        !order.client_name.toLowerCase().includes(q) &&
-        !order.position.toLowerCase().includes(q)
-      )
-        return false
+  // ─── Build API filter params ──────────────────────────────────────────
+  const filters = useMemo<StaffingOrderFilter>(() => {
+    const f: StaffingOrderFilter = {
+      page: currentPage,
+      per_page: perPage,
+      sort: sortValue,
     }
-    return true
-  })
+    if (debouncedSearch) f.search = debouncedSearch
+    if (statusFilter !== "all") f.status = statusFilter
+    if (urgencyFilter && urgencyFilter !== "all") f.urgency = urgencyFilter
+    // service_type is passed as generic query param
+    if (serviceFilter && serviceFilter !== "all") f.service_type = serviceFilter
+    return f
+  }, [currentPage, perPage, sortValue, debouncedSearch, statusFilter, urgencyFilter, serviceFilter])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
-  const paginated = filtered.slice(
-    (currentPage - 1) * perPage,
-    currentPage * perPage
-  )
+  // ─── Data fetching ────────────────────────────────────────────────────
+  const { data, isLoading } = useStaffingOrders(filters)
+  const updateStatusMutation = useUpdateOrderStatus()
+  const deleteMutation = useDeleteStaffingOrder()
+
+  const orders = data?.data ?? []
+  const meta = data?.meta
+  const totalPages = meta?.last_page ?? 1
+  const totalItems = meta?.total ?? 0
+  const startItem = totalItems === 0 ? 0 : (meta?.from ?? 0)
+  const endItem = meta?.to ?? 0
+
+  // ─── Search debounce handler ──────────────────────────────────────────
+  function handleSearchChange(value: string) {
+    setSearchQuery(value)
+    if (searchTimer) clearTimeout(searchTimer)
+    const timer = setTimeout(() => {
+      setDebouncedSearch(value)
+      setCurrentPage(1)
+    }, 400)
+    setSearchTimer(timer)
+  }
 
   // Check if any filter is active
   const hasActiveFilters =
@@ -421,24 +355,18 @@ export function OrderList() {
     (serviceFilter !== "" && serviceFilter !== "all") ||
     statusFilter !== "all"
 
-  // Pagination display range
-  const startItem = filtered.length === 0 ? 0 : (currentPage - 1) * perPage + 1
-  const endItem = Math.min(currentPage * perPage, filtered.length)
-
   // ─── Selection helpers ──────────────────────────────────────────────────
 
-  const allPageSelected = paginated.length > 0 && paginated.every((o) => selectedIds.has(o.id))
-  const somePageSelected = paginated.some((o) => selectedIds.has(o.id))
+  const allPageSelected = orders.length > 0 && orders.every((o) => selectedIds.has(o.id))
+  const somePageSelected = orders.some((o) => selectedIds.has(o.id))
 
   function toggleSelectAll() {
     setSelectedIds((prev) => {
       const next = new Set(prev)
       if (allPageSelected) {
-        // Deselect all on current page
-        paginated.forEach((o) => next.delete(o.id))
+        orders.forEach((o) => next.delete(o.id))
       } else {
-        // Select all on current page
-        paginated.forEach((o) => next.add(o.id))
+        orders.forEach((o) => next.add(o.id))
       }
       return next
     })
@@ -463,86 +391,99 @@ export function OrderList() {
   // ─── Action helpers ─────────────────────────────────────────────────────
 
   function handleBulkStatusChange(status: OrderStatus) {
-    const count = selectedIds.size
-    setOrders((prev) =>
-      prev.map((o) => (selectedIds.has(o.id) ? { ...o, status } : o))
-    )
-    toast.success(`Đã đổi trạng thái ${count} yêu cầu sang "${STATUS_CONFIG[status].label}"`)
-    clearSelection()
-  }
-
-  function handleBulkUrgencyChange(urgency: UrgencyLevel) {
-    const count = selectedIds.size
-    setOrders((prev) =>
-      prev.map((o) => (selectedIds.has(o.id) ? { ...o, urgency } : o))
-    )
-    toast.success(`Đã đổi độ khẩn ${count} yêu cầu sang "${URGENCY_CONFIG[urgency].label}"`)
-    clearSelection()
+    const ids = Array.from(selectedIds)
+    let completed = 0
+    const total = ids.length
+    ids.forEach((id) => {
+      updateStatusMutation.mutate(
+        { id, status },
+        {
+          onSuccess: () => {
+            completed++
+            if (completed === total) {
+              toast.success(`Đã đổi trạng thái ${total} yêu cầu sang "${STATUS_CONFIG[status]?.label ?? status}"`)
+              clearSelection()
+            }
+          },
+        },
+      )
+    })
   }
 
   function handleBulkExport() {
     const selectedOrders = orders.filter((o) => selectedIds.has(o.id))
-    const lines = selectedOrders.map((o) => `${o.code}\t${o.client_name}\t${o.position}\t${o.quantity_filled}/${o.quantity_needed}\t${STATUS_CONFIG[o.status].label}`)
-    const text = "Mã đơn\tKhách hàng\tVị trí\tTiến độ\tTrạng thái\n" + lines.join("\n")
-    navigator.clipboard.writeText(text).then(() => {
-      toast.success(`Đã copy ${selectedIds.size} yêu cầu vào clipboard (có thể paste vào Excel)`)
-    }).catch(() => {
-      toast.success(`Đã xuất ${selectedIds.size} yêu cầu`)
-    })
+    const lines = selectedOrders.map(
+      (o) =>
+        `${o.order_code}\t${o.client?.company_name ?? "—"}\t${o.position_name}\t${o.quantity_filled}/${o.quantity_needed}\t${o.status_label}`,
+    )
+    const text =
+      "Mã đơn\tKhách hàng\tVị trí\tTiến độ\tTrạng thái\n" + lines.join("\n")
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        toast.success(
+          `Đã copy ${selectedIds.size} yêu cầu vào clipboard (có thể paste vào Excel)`,
+        )
+      })
+      .catch(() => {
+        toast.success(`Đã xuất ${selectedIds.size} yêu cầu`)
+      })
     clearSelection()
   }
 
   function handleBulkSendRecruiter() {
-    const count = selectedIds.size
-    setOrders((prev) =>
-      prev.map((o) => (selectedIds.has(o.id) && o.status === "new" ? { ...o, status: "processing" as OrderStatus } : o))
-    )
-    toast.success(`Đã gửi ${count} yêu cầu cho Recruiter (chuyển sang Đang xử lý)`)
-    clearSelection()
-  }
-
-  function handleExportAll() {
-    const lines = filtered.map((o) => `${o.code}\t${o.client_name}\t${o.position}\t${o.quantity_filled}/${o.quantity_needed}\t${STATUS_CONFIG[o.status].label}`)
-    const text = "Mã đơn\tKhách hàng\tVị trí\tTiến độ\tTrạng thái\n" + lines.join("\n")
-    navigator.clipboard.writeText(text).then(() => {
-      toast.success(`Đã copy ${filtered.length} yêu cầu vào clipboard`)
-    }).catch(() => {
-      toast.success(`Đã xuất ${filtered.length} yêu cầu ra file Excel`)
+    const ids = Array.from(selectedIds)
+    let completed = 0
+    const total = ids.length
+    ids.forEach((id) => {
+      updateStatusMutation.mutate(
+        { id, status: "recruiting" },
+        {
+          onSuccess: () => {
+            completed++
+            if (completed === total) {
+              toast.success(`Đã gửi ${total} yêu cầu cho Recruiter (chuyển sang Đang tuyển)`)
+              clearSelection()
+            }
+          },
+        },
+      )
     })
   }
 
-  function handleDuplicate(order: Order) {
-    const newId = String(Date.now())
-    const newCode = order.code.replace(/(\d+)$/, (m) => String(Number(m) + 10))
-    const newOrder: Order = {
-      ...order,
-      id: newId,
-      code: newCode,
-      status: "new",
-      quantity_filled: 0,
-      created_at: new Date().toISOString().split("T")[0],
-    }
-    setOrders((prev) => [newOrder, ...prev])
-    toast.success(`Đã nhân đôi → ${newCode}`)
+  function handleExportAll() {
+    const lines = orders.map(
+      (o) =>
+        `${o.order_code}\t${o.client?.company_name ?? "—"}\t${o.position_name}\t${o.quantity_filled}/${o.quantity_needed}\t${o.status_label}`,
+    )
+    const text =
+      "Mã đơn\tKhách hàng\tVị trí\tTiến độ\tTrạng thái\n" + lines.join("\n")
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        toast.success(`Đã copy ${orders.length} yêu cầu vào clipboard`)
+      })
+      .catch(() => {
+        toast.success(`Đã xuất ${orders.length} yêu cầu ra file Excel`)
+      })
   }
 
-  function handlePrint(order: Order) {
-    toast.info(`Đang in phiếu yêu cầu ${order.code}...`)
-    // Open print preview with order info
+  function handlePrint(order: StaffingOrder) {
+    toast.info(`Đang in phiếu yêu cầu ${order.order_code}...`)
     const w = window.open("", "_blank", "width=800,height=600")
     if (w) {
       w.document.write(`
-        <html><head><title>Phiếu YCTD ${order.code}</title>
+        <html><head><title>Phiếu YCTD ${order.order_code}</title>
         <style>body{font-family:sans-serif;padding:40px}h1{font-size:20px}table{width:100%;border-collapse:collapse;margin-top:20px}td,th{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f5f5f5}</style>
         </head><body>
-        <h1>PHIẾU YÊU CẦU TUYỂN DỤNG - ${order.code}</h1>
+        <h1>PHIẾU YÊU CẦU TUYỂN DỤNG - ${order.order_code}</h1>
         <table>
-          <tr><th>Khách hàng</th><td>${order.client_name}</td></tr>
-          <tr><th>Vị trí</th><td>${order.position}</td></tr>
+          <tr><th>Khách hàng</th><td>${order.client?.company_name ?? "—"}</td></tr>
+          <tr><th>Vị trí</th><td>${order.position_name}</td></tr>
           <tr><th>Số lượng</th><td>${order.quantity_needed} người</td></tr>
           <tr><th>Đã có</th><td>${order.quantity_filled} người</td></tr>
-          <tr><th>Trạng thái</th><td>${STATUS_CONFIG[order.status].label}</td></tr>
-          <tr><th>Độ khẩn</th><td>${URGENCY_CONFIG[order.urgency].label}</td></tr>
+          <tr><th>Trạng thái</th><td>${order.status_label}</td></tr>
+          <tr><th>Độ khẩn</th><td>${order.urgency_label ?? "Bình thường"}</td></tr>
           <tr><th>Ngày bắt đầu</th><td>${formatDate(order.start_date)}</td></tr>
         </table>
         <script>setTimeout(()=>window.print(),300)</script>
@@ -551,11 +492,15 @@ export function OrderList() {
     }
   }
 
-  function handleSingleStatusChange(order: Order, status: OrderStatus) {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === order.id ? { ...o, status } : o))
+  function handleSingleStatusChange(order: StaffingOrder, status: OrderStatus) {
+    updateStatusMutation.mutate(
+      { id: order.id, status },
+      {
+        onSuccess: () => {
+          toast.success(`Đã đổi trạng thái ${order.order_code} sang "${STATUS_CONFIG[status]?.label ?? status}"`)
+        },
+      },
     )
-    toast.success(`Đã đổi trạng thái ${order.code} sang "${STATUS_CONFIG[status].label}"`)
   }
 
   function openCancelDialog(ids: string[], label: string) {
@@ -565,20 +510,33 @@ export function OrderList() {
 
   function confirmCancel() {
     if (!cancelTarget) return
-    setOrders((prev) =>
-      prev.map((o) => (cancelTarget.ids.includes(o.id) ? { ...o, status: "cancelled" as OrderStatus } : o))
-    )
-    toast.success(`Đã hủy ${cancelTarget.ids.length} yêu cầu tuyển dụng`)
-    clearSelection()
-    setCancelDialogOpen(false)
-    setCancelTarget(null)
+    const ids = cancelTarget.ids
+    let completed = 0
+    ids.forEach((id) => {
+      updateStatusMutation.mutate(
+        { id, status: "cancelled" },
+        {
+          onSuccess: () => {
+            completed++
+            if (completed === ids.length) {
+              toast.success(`Đã hủy ${ids.length} yêu cầu tuyển dụng`)
+              clearSelection()
+              setCancelDialogOpen(false)
+              setCancelTarget(null)
+            }
+          },
+        },
+      )
+    })
   }
 
   function resetAllFilters() {
     setSearchQuery("")
+    setDebouncedSearch("")
     setStatusFilter("all")
     setUrgencyFilter("")
     setServiceFilter("")
+    setSortValue("-created_at")
     setCurrentPage(1)
   }
 
@@ -611,14 +569,16 @@ export function OrderList() {
               <Download className="mr-1.5 h-3.5 w-3.5" />
               Xuất Excel
             </Button>
-            <Button
-              size="sm"
-              className="bg-white text-primary hover:bg-white/90 shadow-sm"
-              onClick={() => navigate("/orders/create")}
-            >
-              <Plus className="mr-1.5 h-3.5 w-3.5" />
-              Tạo yêu cầu
-            </Button>
+            {can("orders.create") && (
+              <Button
+                size="sm"
+                className="bg-white text-primary hover:bg-white/90 shadow-sm"
+                onClick={() => navigate("/orders/create")}
+              >
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                Tạo yêu cầu
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -635,11 +595,6 @@ export function OrderList() {
           {STATUS_TABS.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5">
               {tab.label}
-              <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">
-                {tab.value === "all"
-                  ? orders.length
-                  : orders.filter((o) => o.status === tab.value).length}
-              </span>
             </TabsTrigger>
           ))}
         </TabsList>
@@ -652,10 +607,7 @@ export function OrderList() {
           <Input
             placeholder="Tìm mã đơn, khách hàng, vị trí..."
             value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value)
-              setCurrentPage(1)
-            }}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="h-9 pl-9"
           />
         </div>
@@ -712,15 +664,19 @@ export function OrderList() {
 
       {/* Results count */}
       <div className="flex items-center justify-between">
-        <p className="text-[13px] text-muted-foreground">
-          Hiển thị{" "}
-          <span className="font-semibold text-foreground">
-            {startItem}-{endItem}
-          </span>{" "}
-          trên{" "}
-          <span className="font-semibold text-foreground">{filtered.length}</span>{" "}
-          yêu cầu
-        </p>
+        {isLoading ? (
+          <Skeleton className="h-4 w-40" />
+        ) : (
+          <p className="text-[13px] text-muted-foreground">
+            Hiển thị{" "}
+            <span className="font-semibold text-foreground">
+              {startItem}-{endItem}
+            </span>{" "}
+            trên{" "}
+            <span className="font-semibold text-foreground">{totalItems}</span>{" "}
+            yêu cầu
+          </p>
+        )}
       </div>
 
       {/* Bulk Actions Bar */}
@@ -732,40 +688,26 @@ export function OrderList() {
 
           <div className="flex items-center gap-1.5">
             {/* Bulk status change */}
-            <DropdownMenu>
-              <DropdownMenuTrigger className="inline-flex h-8 items-center gap-1.5 rounded-md border bg-background px-3 text-xs font-medium hover:bg-muted transition-colors">
-                <RefreshCw className="h-3.5 w-3.5" />
-                Đổi trạng thái
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="min-w-[160px]">
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel>Chọn trạng thái</DropdownMenuLabel>
-                  {(Object.keys(STATUS_CONFIG) as OrderStatus[]).map((status) => (
-                    <DropdownMenuItem key={status} onClick={() => handleBulkStatusChange(status)}>
-                      {STATUS_CONFIG[status].label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {can("orders.update") && (
+              <DropdownMenu>
+                <DropdownMenuTrigger className="inline-flex h-8 items-center gap-1.5 rounded-md border bg-background px-3 text-xs font-medium hover:bg-muted transition-colors">
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Đổi trạng thái
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="min-w-[160px]">
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>Chọn trạng thái</DropdownMenuLabel>
+                    {(Object.keys(STATUS_CONFIG) as OrderStatus[]).map((status) => (
+                      <DropdownMenuItem key={status} onClick={() => handleBulkStatusChange(status)}>
+                        {STATUS_CONFIG[status].label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
 
-            {/* Bulk urgency change */}
-            <DropdownMenu>
-              <DropdownMenuTrigger className="inline-flex h-8 items-center gap-1.5 rounded-md border bg-background px-3 text-xs font-medium hover:bg-muted transition-colors">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                Đổi độ khẩn
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel>Chọn độ khẩn</DropdownMenuLabel>
-                  {(Object.keys(URGENCY_CONFIG) as UrgencyLevel[]).map((urgency) => (
-                    <DropdownMenuItem key={urgency} onClick={() => handleBulkUrgencyChange(urgency)}>
-                      {URGENCY_CONFIG[urgency].label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Bulk urgency change - removed since backend doesn't support batch urgency update */}
 
             {/* Bulk export */}
             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleBulkExport}>
@@ -774,24 +716,28 @@ export function OrderList() {
             </Button>
 
             {/* Send to recruiter */}
-            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleBulkSendRecruiter}>
-              <Send className="mr-1.5 h-3.5 w-3.5" />
-              Gửi cho Recruiter
-            </Button>
+            {can("orders.assign") && (
+              <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleBulkSendRecruiter}>
+                <Send className="mr-1.5 h-3.5 w-3.5" />
+                Gửi cho Recruiter
+              </Button>
+            )}
 
             {/* Bulk cancel */}
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
-              onClick={() => {
-                const ids = Array.from(selectedIds)
-                openCancelDialog(ids, `${ids.length} yêu cầu tuyển dụng`)
-              }}
-            >
-              <XCircle className="mr-1.5 h-3.5 w-3.5" />
-              Hủy đơn
-            </Button>
+            {can("orders.update") && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
+                onClick={() => {
+                  const ids = Array.from(selectedIds)
+                  openCancelDialog(ids, `${ids.length} yêu cầu tuyển dụng`)
+                }}
+              >
+                <XCircle className="mr-1.5 h-3.5 w-3.5" />
+                Hủy đơn
+              </Button>
+            )}
           </div>
 
           <div className="ml-auto">
@@ -803,7 +749,9 @@ export function OrderList() {
       )}
 
       {/* Data Table */}
-      {paginated.length === 0 ? (
+      {isLoading ? (
+        <TableSkeleton />
+      ) : orders.length === 0 ? (
         <Card>
           <CardContent className="p-0">
             <EmptyState />
@@ -823,20 +771,30 @@ export function OrderList() {
                       aria-label="Chọn tất cả"
                     />
                   </TableHead>
-                  <TableHead className="w-[120px]">Mã đơn</TableHead>
+                  <SortableHeader label="Mã đơn" field="order_code" currentSort={sortValue} onSort={handleSort} className="w-[120px]" />
                   <TableHead className="min-w-[160px]">Khách hàng</TableHead>
                   <TableHead>Vị trí tuyển</TableHead>
-                  <TableHead className="w-[120px]">Tiến độ</TableHead>
-                  <TableHead className="w-[100px]">Trạng thái</TableHead>
-                  <TableHead className="w-[90px]">Độ khẩn</TableHead>
+                  <SortableHeader label="Tiến độ" field="quantity_needed" currentSort={sortValue} onSort={handleSort} className="w-[120px]" />
+                  <SortableHeader label="Trạng thái" field="status" currentSort={sortValue} onSort={handleSort} className="w-[100px]" />
+                  <SortableHeader label="Độ khẩn" field="urgency" currentSort={sortValue} onSort={handleSort} className="w-[90px]" />
                   <TableHead className="w-[44px]" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginated.map((order) => {
-                  const statusConf = STATUS_CONFIG[order.status]
-                  const urgencyConf = URGENCY_CONFIG[order.urgency]
+                {orders.map((order) => {
+                  const statusConf = STATUS_CONFIG[order.status] ?? {
+                    label: order.status_label,
+                    className: "bg-gray-100 text-gray-600 border-gray-200/80",
+                  }
+                  const urgencyConf = order.urgency
+                    ? URGENCY_CONFIG[order.urgency] ?? {
+                        label: order.urgency_label ?? order.urgency,
+                        className: "bg-gray-100 text-gray-600 border-gray-200/80",
+                      }
+                    : { label: "Bình thường", className: "bg-gray-100 text-gray-600 border-gray-200/80" }
                   const isSelected = selectedIds.has(order.id)
+                  const clientName = order.client?.company_name ?? "—"
+                  const avatarColor = getAvatarColor(order.client_id ?? order.id)
 
                   return (
                     <TableRow
@@ -848,30 +806,30 @@ export function OrderList() {
                         <Checkbox
                           checked={isSelected}
                           onCheckedChange={() => toggleSelectRow(order.id)}
-                          aria-label={`Chọn ${order.code}`}
+                          aria-label={`Chọn ${order.order_code}`}
                         />
                       </TableCell>
                       <TableCell>
                         <span className="font-mono text-xs font-semibold text-primary">
-                          {order.code}
+                          {order.order_code}
                         </span>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2.5">
                           <Avatar className="h-8 w-8 rounded-lg">
                             <AvatarFallback
-                              className={`bg-gradient-to-br ${order.client_avatar_color} rounded-lg text-[10px] font-semibold text-white`}
+                              className={`bg-gradient-to-br ${avatarColor} rounded-lg text-[10px] font-semibold text-white`}
                             >
-                              {getInitials(order.client_name)}
+                              {getInitials(clientName)}
                             </AvatarFallback>
                           </Avatar>
                           <span className="text-sm font-medium truncate max-w-[180px]">
-                            {order.client_name}
+                            {clientName}
                           </span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm">{order.position}</span>
+                        <span className="text-sm">{order.position_name}</span>
                       </TableCell>
                       <TableCell>
                         <ProgressBar
@@ -915,52 +873,49 @@ export function OrderList() {
                                 <Eye className="mr-2 h-4 w-4" />
                                 Xem chi tiết
                               </DropdownMenuItem>
+                              {can("orders.update") && (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    navigate(`/orders/${order.id}/edit`)
+                                  }}
+                                >
+                                  <Pencil className="mr-2 h-4 w-4" />
+                                  Chỉnh sửa
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                }}
-                              >
-                                <Pencil className="mr-2 h-4 w-4" />
-                                Chỉnh sửa
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation()
+                                  navigate(`/orders/${order.id}`)
                                 }}
                               >
                                 <Users className="mr-2 h-4 w-4" />
                                 Điều phối
                               </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleDuplicate(order)
-                                }}
-                              >
-                                <Copy className="mr-2 h-4 w-4" />
-                                Nhân đôi
-                              </DropdownMenuItem>
 
                               {/* Status change submenu */}
-                              <DropdownMenuSub>
-                                <DropdownMenuSubTrigger>
-                                  <RefreshCw className="mr-2 h-4 w-4" />
-                                  Đổi trạng thái
-                                </DropdownMenuSubTrigger>
-                                <DropdownMenuSubContent className="min-w-[140px]">
-                                  {(["new", "processing", "dispatched", "completed"] as OrderStatus[]).map((status) => (
-                                    <DropdownMenuItem
-                                      key={status}
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        handleSingleStatusChange(order, status)
-                                      }}
-                                    >
-                                      {STATUS_CONFIG[status].label}
-                                    </DropdownMenuItem>
-                                  ))}
-                                </DropdownMenuSubContent>
-                              </DropdownMenuSub>
+                              {can("orders.update") && (
+                                <DropdownMenuSub>
+                                  <DropdownMenuSubTrigger>
+                                    <RefreshCw className="mr-2 h-4 w-4" />
+                                    Đổi trạng thái
+                                  </DropdownMenuSubTrigger>
+                                  <DropdownMenuSubContent className="min-w-[140px]">
+                                    {(["pending", "approved", "recruiting", "filled", "in_progress", "completed"] as OrderStatus[]).map((status) => (
+                                      <DropdownMenuItem
+                                        key={status}
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleSingleStatusChange(order, status)
+                                        }}
+                                      >
+                                        {STATUS_CONFIG[status].label}
+                                      </DropdownMenuItem>
+                                    ))}
+                                  </DropdownMenuSubContent>
+                                </DropdownMenuSub>
+                              )}
 
                               <DropdownMenuItem
                                 onClick={(e) => {
@@ -980,17 +935,21 @@ export function OrderList() {
                                 <History className="mr-2 h-4 w-4" />
                                 Xem lịch sử
                               </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                variant="destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  openCancelDialog([order.id], `yêu cầu ${order.code}`)
-                                }}
-                              >
-                                <XCircle className="mr-2 h-4 w-4" />
-                                Hủy đơn
-                              </DropdownMenuItem>
+                              {can("orders.update") && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    variant="destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      openCancelDialog([order.id], `yêu cầu ${order.order_code}`)
+                                    }}
+                                  >
+                                    <XCircle className="mr-2 h-4 w-4" />
+                                    Hủy đơn
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                             </DropdownMenuGroup>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -1046,6 +1005,30 @@ export function OrderList() {
               </PaginationItem>
               {Array.from({ length: totalPages }).map((_, i) => {
                 const page = i + 1
+                // Show limited page numbers for large datasets
+                if (
+                  totalPages > 7 &&
+                  page !== 1 &&
+                  page !== totalPages &&
+                  Math.abs(page - currentPage) > 2
+                ) {
+                  // Show ellipsis at boundaries
+                  if (page === 2 && currentPage > 4) {
+                    return (
+                      <PaginationItem key={page}>
+                        <span className="px-2 text-muted-foreground">...</span>
+                      </PaginationItem>
+                    )
+                  }
+                  if (page === totalPages - 1 && currentPage < totalPages - 3) {
+                    return (
+                      <PaginationItem key={page}>
+                        <span className="px-2 text-muted-foreground">...</span>
+                      </PaginationItem>
+                    )
+                  }
+                  return null
+                }
                 return (
                   <PaginationItem key={page}>
                     <PaginationLink
@@ -1093,7 +1076,11 @@ export function OrderList() {
             <AlertDialogAction
               variant="destructive"
               onClick={confirmCancel}
+              disabled={updateStatusMutation.isPending}
             >
+              {updateStatusMutation.isPending && (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              )}
               Xác nhận hủy
             </AlertDialogAction>
           </AlertDialogFooter>

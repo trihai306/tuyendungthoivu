@@ -10,11 +10,13 @@ use App\Http\Requests\StoreStaffingOrderRequest;
 use App\Http\Requests\UpdateStaffingOrderRequest;
 use App\Http\Resources\StaffingOrderResource;
 use App\Models\StaffingOrder;
+use App\Traits\ScopesDataByRole;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class StaffingOrderController extends Controller
 {
+    use ScopesDataByRole;
     public function __construct(
         private readonly CreateStaffingOrder $createStaffingOrder,
         private readonly ApproveStaffingOrder $approveStaffingOrder,
@@ -26,18 +28,44 @@ class StaffingOrderController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $eagerLoad = ['client', 'assignedRecruiter'];
+
+        // Allow including extra relations (e.g. ?include=assignments.worker)
+        if ($request->filled('include')) {
+            $allowed = ['assignments', 'assignments.worker'];
+            $includes = array_filter(
+                explode(',', $request->input('include')),
+                fn ($rel) => in_array(trim($rel), $allowed)
+            );
+            $eagerLoad = array_merge($eagerLoad, $includes);
+        }
+
         $query = StaffingOrder::query()
-            ->with(['client', 'assignedRecruiter'])
+            ->with($eagerLoad)
             ->withCount('assignments');
+
+        // Role-based data scoping: Recruiters see only assigned/created orders
+        $user = $request->user();
+        if (!$this->isManagerOrAbove($user)) {
+            $query->where(function ($q) use ($user) {
+                $q->where('assigned_recruiter_id', $user->id)
+                  ->orWhere('created_by', $user->id);
+            });
+        }
 
         // Search by order_code, position_name, client company_name
         if ($request->filled('search')) {
             $query->search($request->input('search'));
         }
 
-        // Filter by status
+        // Filter by status (supports comma-separated values for multi-status filtering)
         if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
+            $statuses = explode(',', $request->input('status'));
+            if (count($statuses) === 1) {
+                $query->where('status', $statuses[0]);
+            } else {
+                $query->whereIn('status', $statuses);
+            }
         }
 
         // Filter by urgency
@@ -113,7 +141,7 @@ class StaffingOrderController extends Controller
 
         return response()->json([
             'data' => new StaffingOrderResource($order),
-            'message' => 'Chi tiet don hang',
+            'message' => 'Chi tiết đơn hàng',
         ]);
     }
 
@@ -130,7 +158,7 @@ class StaffingOrderController extends Controller
 
         return response()->json([
             'data' => new StaffingOrderResource($order->load('client')),
-            'message' => 'Tao don hang thanh cong',
+            'message' => 'Tạo đơn hàng thành công',
         ], 201);
     }
 
@@ -145,7 +173,7 @@ class StaffingOrderController extends Controller
         // Only allow updates for draft or pending orders
         if (!in_array($order->status, [OrderStatus::Draft, OrderStatus::Pending])) {
             return response()->json([
-                'message' => 'Chi co the cap nhat don hang o trang thai nhap hoac cho duyet.',
+                'message' => 'Chỉ có thể cập nhật đơn hàng ở trạng thái nháp hoặc chờ duyệt.',
             ], 422);
         }
 
@@ -153,7 +181,7 @@ class StaffingOrderController extends Controller
 
         return response()->json([
             'data' => new StaffingOrderResource($order->fresh()->load('client', 'assignedRecruiter')),
-            'message' => 'Cap nhat don hang thanh cong',
+            'message' => 'Cập nhật đơn hàng thành công',
         ]);
     }
 
@@ -167,14 +195,14 @@ class StaffingOrderController extends Controller
 
         if ($order->status !== OrderStatus::Draft) {
             return response()->json([
-                'message' => 'Chi co the xoa don hang o trang thai nhap.',
+                'message' => 'Chỉ có thể xóa đơn hàng ở trạng thái nháp.',
             ], 422);
         }
 
         $order->delete();
 
         return response()->json([
-            'message' => 'Xoa don hang thanh cong',
+            'message' => 'Xóa đơn hàng thành công',
         ]);
     }
 
@@ -193,7 +221,7 @@ class StaffingOrderController extends Controller
 
         return response()->json([
             'data' => new StaffingOrderResource($approvedOrder->load('client', 'approvedBy')),
-            'message' => 'Duyet don hang thanh cong',
+            'message' => 'Duyệt đơn hàng thành công',
         ]);
     }
 
@@ -214,7 +242,7 @@ class StaffingOrderController extends Controller
 
         return response()->json([
             'data' => new StaffingOrderResource($order->fresh()->load('client', 'assignedRecruiter')),
-            'message' => 'Phan cong recruiter thanh cong',
+            'message' => 'Phân công recruiter thành công',
         ]);
     }
 
@@ -234,7 +262,7 @@ class StaffingOrderController extends Controller
         // Validate state transition
         if (!$order->status->canTransitionTo($newStatus)) {
             return response()->json([
-                'message' => "Khong the chuyen trang thai tu '{$order->status->label()}' sang '{$newStatus->label()}'.",
+                'message' => "Không thể chuyển trạng thái từ '{$order->status->label()}' sang '{$newStatus->label()}'.",
             ], 422);
         }
 
@@ -258,7 +286,7 @@ class StaffingOrderController extends Controller
 
         return response()->json([
             'data' => new StaffingOrderResource($order->fresh()->load('client', 'assignedRecruiter')),
-            'message' => 'Cap nhat trang thai don hang thanh cong',
+            'message' => 'Cập nhật trạng thái đơn hàng thành công',
         ]);
     }
 }

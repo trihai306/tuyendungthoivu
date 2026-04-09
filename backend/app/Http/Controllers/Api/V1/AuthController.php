@@ -24,6 +24,7 @@ class AuthController extends Controller
             'status' => 'active',
         ]);
 
+        $user->load(['roles.permissions']);
         $token = $user->createToken('auth-token')->plainTextToken;
 
         return response()->json([
@@ -46,6 +47,7 @@ class AuthController extends Controller
         }
 
         $user->update(['last_login_at' => now()]);
+        $user->load(['roles.permissions']);
 
         $token = $user->createToken('auth-token')->plainTextToken;
 
@@ -68,7 +70,7 @@ class AuthController extends Controller
     public function me(Request $request)
     {
         $user = $request->user();
-        $user->load(['workerProfile', 'employer']);
+        $user->load(['workerProfile', 'employer', 'roles.permissions']);
 
         return response()->json([
             'user' => new UserResource($user),

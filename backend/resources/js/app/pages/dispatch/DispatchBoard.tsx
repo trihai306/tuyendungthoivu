@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
+import { usePermissions } from "@/hooks/use-permissions"
 import { toast } from "sonner"
 import {
   Card,
@@ -13,20 +14,14 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +33,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   Users,
   UserCheck,
   UserX,
@@ -47,7 +48,6 @@ import {
   ExternalLink,
   MapPin,
   Clock,
-  Phone,
   Star,
   Search,
   CalendarDays,
@@ -59,23 +59,46 @@ import {
   RefreshCw,
   Package,
   Sparkles,
-  Filter,
   X,
+  Zap,
+  ChevronDown,
+  Loader2,
 } from "lucide-react"
 
+// API hooks
+import { useStaffingOrders } from "@/hooks/use-staffing-orders"
+import {
+  useWorkersNew,
+} from "@/hooks/use-workers-new"
+import {
+  useCreateAssignment,
+  useBulkAssign,
+  useRemoveAssignment,
+  useUpdateAssignmentStatus,
+} from "@/hooks/use-assignments"
+import type {
+  StaffingOrder,
+  Assignment,
+  WorkerNew,
+  AssignmentStatus,
+} from "@/types"
+
 // ---------------------------------------------------------------------------
-// Types
+// Types (UI-only shapes, mapped from API data)
 // ---------------------------------------------------------------------------
 
 type WorkerAssignmentStatus = "confirmed" | "pending" | "rejected" | "replaced"
 type OrderDispatchStatus = "dispatching" | "fulfilled" | "new" | "shortage"
+type StatusFilter = OrderDispatchStatus | "all"
 
 interface AssignedWorker {
-  id: string
+  id: string          // assignment id
+  workerId: string    // worker profile id
   name: string
   phone: string
   status: WorkerAssignmentStatus
   avatar: string
+  assignmentStatus: AssignmentStatus // raw API status for mutations
 }
 
 interface DispatchOrder {
@@ -102,115 +125,147 @@ interface AvailableWorker {
 }
 
 // ---------------------------------------------------------------------------
-// Mock Data
+// Skill-matching keywords map: position keywords -> worker skill keywords
 // ---------------------------------------------------------------------------
 
-const INITIAL_ORDERS: DispatchOrder[] = [
-  {
-    id: "1",
-    code: "ORD-024",
-    customer: "Cty Thuc pham Viet",
-    position: "Phuc vu nha hang",
-    shift: "06:00 - 14:00",
-    address: "123 Nguyen Hue, Q.1, TP.HCM",
-    workersNeeded: 8,
-    workersAssigned: 5,
-    status: "dispatching",
-    assignedWorkers: [
-      { id: "w1", name: "Nguyen Van An", phone: "0901 234 567", status: "confirmed", avatar: "NA" },
-      { id: "w2", name: "Tran Thi Bich", phone: "0902 345 678", status: "confirmed", avatar: "TB" },
-      { id: "w3", name: "Le Van Cuong", phone: "0903 456 789", status: "pending", avatar: "LC" },
-      { id: "w4", name: "Pham Thi Dao", phone: "0904 567 890", status: "confirmed", avatar: "PD" },
-      { id: "w5", name: "Hoang Van Em", phone: "0905 678 901", status: "pending", avatar: "HE" },
-    ],
-  },
-  {
-    id: "2",
-    code: "ORD-025",
-    customer: "Samsung HCMC",
-    position: "Cong nhan dong goi",
-    shift: "08:00 - 17:00",
-    address: "KCN Tan Binh, Q. Tan Phu, TP.HCM",
-    workersNeeded: 10,
-    workersAssigned: 10,
-    status: "fulfilled",
-    assignedWorkers: [
-      { id: "w6", name: "Vo Thi Phuong", phone: "0906 111 222", status: "confirmed", avatar: "VP" },
-      { id: "w7", name: "Bui Van Giang", phone: "0907 222 333", status: "confirmed", avatar: "BG" },
-      { id: "w8", name: "Dang Thi Huong", phone: "0908 333 444", status: "confirmed", avatar: "DH" },
-      { id: "w9", name: "Nguyen Van Ich", phone: "0909 444 555", status: "confirmed", avatar: "NI" },
-      { id: "w10", name: "Tran Van Kha", phone: "0910 555 666", status: "confirmed", avatar: "TK" },
-      { id: "w11", name: "Le Thi Loan", phone: "0911 666 777", status: "confirmed", avatar: "LL" },
-      { id: "w12", name: "Pham Van Minh", phone: "0912 777 888", status: "confirmed", avatar: "PM" },
-      { id: "w13", name: "Hoang Thi Nga", phone: "0913 888 999", status: "confirmed", avatar: "HN" },
-      { id: "w14", name: "Vo Van Oanh", phone: "0914 999 000", status: "confirmed", avatar: "VO" },
-      { id: "w15", name: "Bui Thi Phuong", phone: "0915 000 111", status: "confirmed", avatar: "BP" },
-    ],
-  },
-  {
-    id: "3",
-    code: "ORD-026",
-    customer: "Galaxy Event",
-    position: "Phuc vu su kien",
-    shift: "16:00 - 23:00",
-    address: "White Palace, 194 Hoang Van Thu, Q.Phu Nhuan",
-    workersNeeded: 15,
-    workersAssigned: 0,
-    status: "new",
-    assignedWorkers: [],
-  },
-  {
-    id: "4",
-    code: "ORD-027",
-    customer: "Lazada Express",
-    position: "Boc xep hang hoa",
-    shift: "05:00 - 12:00",
-    address: "Kho Lazada, Q.9, TP.HCM",
-    workersNeeded: 5,
-    workersAssigned: 3,
-    status: "shortage",
-    assignedWorkers: [
-      { id: "w16", name: "Nguyen Van Quang", phone: "0916 123 456", status: "confirmed", avatar: "NQ" },
-      { id: "w17", name: "Tran Thi Ren", phone: "0917 234 567", status: "rejected", avatar: "TR" },
-      { id: "w18", name: "Le Van Son", phone: "0918 345 678", status: "confirmed", avatar: "LS" },
-    ],
-  },
-]
+const SKILL_MATCH_MAP: Record<string, string[]> = {
+  "phục vụ": ["phục vụ", "bartender", "pha chế", "bếp"],
+  "sự kiện": ["sự kiện", "phục vụ", "pha chế"],
+  "đóng gói": ["đóng gói", "qc"],
+  "bốc xếp": ["bốc xếp", "kho vận", "lái xe"],
+  "công nhân": ["đóng gói", "qc", "bốc xếp"],
+}
 
-const INITIAL_AVAILABLE_WORKERS: AvailableWorker[] = [
-  { id: "a1", name: "Nguyen Minh Tuan", avatar: "NT", skills: ["Phuc vu", "Pha che"], area: "Q.1", rating: 4.8, phone: "0920 111 222" },
-  { id: "a2", name: "Tran Thi Uyen", avatar: "TU", skills: ["Boc xep", "Kho van"], area: "Q.9", rating: 4.5, phone: "0921 222 333" },
-  { id: "a3", name: "Le Van Vu", avatar: "LV", skills: ["Phuc vu", "Su kien"], area: "Q.3", rating: 4.9, phone: "0922 333 444" },
-  { id: "a4", name: "Pham Thi Xuan", avatar: "PX", skills: ["Dong goi", "QC"], area: "Tan Phu", rating: 4.3, phone: "0923 444 555" },
-  { id: "a5", name: "Hoang Van Yen", avatar: "HY", skills: ["Phuc vu", "Bartender"], area: "Q.7", rating: 4.7, phone: "0924 555 666" },
-  { id: "a6", name: "Vo Thi Dung", avatar: "VD", skills: ["Boc xep"], area: "Q.2", rating: 4.1, phone: "0925 666 777" },
-  { id: "a7", name: "Bui Van Bach", avatar: "BB", skills: ["Su kien", "Phuc vu"], area: "Phu Nhuan", rating: 4.6, phone: "0926 777 888" },
-  { id: "a8", name: "Dang Thi Cam", avatar: "DC", skills: ["Dong goi", "Boc xep"], area: "Binh Tan", rating: 4.4, phone: "0927 888 999" },
-  { id: "a9", name: "Nguyen Van Duc", avatar: "ND", skills: ["Phuc vu"], area: "Q.1", rating: 4.2, phone: "0928 999 000" },
-  { id: "a10", name: "Tran Thi Em", avatar: "TE", skills: ["Su kien", "Pha che"], area: "Q.5", rating: 4.8, phone: "0929 000 111" },
-  { id: "a11", name: "Le Thi Phuong", avatar: "LP", skills: ["Phuc vu", "Bep"], area: "Q.10", rating: 4.0, phone: "0930 111 222" },
-  { id: "a12", name: "Pham Van Gia", avatar: "PG", skills: ["Boc xep", "Lai xe"], area: "Q.12", rating: 4.3, phone: "0931 222 333" },
-]
+function getMatchingSkills(position: string): string[] {
+  const posLower = position.toLowerCase()
+  for (const [keyword, skills] of Object.entries(SKILL_MATCH_MAP)) {
+    if (posLower.includes(keyword)) return skills
+  }
+  return []
+}
+
+function workerMatchesPosition(worker: AvailableWorker, position: string): boolean {
+  const matchSkills = getMatchingSkills(position)
+  if (matchSkills.length === 0) return false
+  return worker.skills.some((s) => s && matchSkills.includes(s.toLowerCase()))
+}
+
+// ---------------------------------------------------------------------------
+// Data mapping helpers (API -> UI shapes)
+// ---------------------------------------------------------------------------
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 0) return "?"
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+}
+
+/** Map Assignment API status to simplified UI status */
+function mapAssignmentStatus(status: AssignmentStatus): WorkerAssignmentStatus {
+  switch (status) {
+    case "confirmed":
+    case "working":
+    case "completed":
+      return "confirmed"
+    case "rejected":
+    case "cancelled":
+    case "no_contact":
+      return "rejected"
+    case "replaced":
+      return "replaced"
+    default: // created, contacted
+      return "pending"
+  }
+}
+
+/** Map StaffingOrder to UI OrderDispatchStatus */
+function computeOrderDispatchStatus(order: StaffingOrder): OrderDispatchStatus {
+  if (order.status === "filled" || order.status === "completed") return "fulfilled"
+  if (order.quantity_filled === 0 && (!order.assignments || order.assignments.length === 0)) return "new"
+  if (order.quantity_filled >= order.quantity_needed) return "fulfilled"
+  const ratio = order.quantity_filled / order.quantity_needed
+  if (ratio < 0.5) return "shortage"
+  return "dispatching"
+}
+
+/** Map a StaffingOrder + its assignments to a DispatchOrder */
+function mapOrderToDispatch(order: StaffingOrder): DispatchOrder {
+  const assignments = order.assignments ?? []
+  // Only count active (non-cancelled/rejected) assignments
+  const activeAssignments = assignments.filter(
+    (a) => !["rejected", "cancelled", "no_contact", "replaced"].includes(a.status)
+  )
+
+  const assignedWorkers: AssignedWorker[] = assignments.map((a) => ({
+    id: a.id,
+    workerId: a.worker_id,
+    name: a.worker?.full_name ?? `Worker #${a.worker_id}`,
+    phone: a.worker?.phone ?? "",
+    status: mapAssignmentStatus(a.status),
+    avatar: a.worker ? getInitials(a.worker.full_name) : "?",
+    assignmentStatus: a.status,
+  }))
+
+  const shift = order.start_time && order.end_time
+    ? `${order.start_time.slice(0, 5)} - ${order.end_time.slice(0, 5)}`
+    : "Chưa xác định"
+
+  return {
+    id: order.id,
+    code: order.order_code,
+    customer: order.client?.company_name ?? "Khách hàng",
+    position: order.position_name,
+    shift,
+    address: order.work_address ?? "Chưa xác định",
+    workersNeeded: order.quantity_needed,
+    workersAssigned: activeAssignments.length,
+    status: computeOrderDispatchStatus(order),
+    assignedWorkers,
+  }
+}
+
+/** Map WorkerNew to AvailableWorker */
+function mapWorkerToAvailable(worker: WorkerNew): AvailableWorker {
+  return {
+    id: worker.id,
+    name: worker.full_name,
+    avatar: getInitials(worker.full_name),
+    skills: worker.skills?.map((s) => s.skill_name).filter(Boolean) ?? [],
+    area: worker.district ?? worker.city ?? "",
+    rating: Number(worker.average_rating) || 0,
+    phone: worker.phone ?? "",
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-const STATUS_CONFIG: Record<OrderDispatchStatus, { label: string; className: string }> = {
-  dispatching: { label: "Dang dieu phoi", className: "bg-amber-100 text-amber-700 border-amber-200" },
-  fulfilled: { label: "Da du", className: "bg-emerald-100 text-emerald-700 border-emerald-200" },
-  new: { label: "Moi", className: "bg-blue-100 text-blue-700 border-blue-200" },
-  shortage: { label: "Thieu nguoi", className: "bg-red-100 text-red-700 border-red-200" },
+const STATUS_CONFIG: Record<OrderDispatchStatus, { label: string; className: string; dotColor: string }> = {
+  new: { label: "Mới", className: "bg-blue-100 text-blue-700 border-blue-200", dotColor: "bg-blue-500" },
+  dispatching: { label: "Đang điều phối", className: "bg-amber-100 text-amber-700 border-amber-200", dotColor: "bg-amber-500" },
+  shortage: { label: "Thiếu người", className: "bg-red-100 text-red-700 border-red-200", dotColor: "bg-red-500" },
+  fulfilled: { label: "Đã đủ", className: "bg-emerald-100 text-emerald-700 border-emerald-200", dotColor: "bg-emerald-500" },
 }
 
-const WORKER_STATUS_CONFIG: Record<WorkerAssignmentStatus, { icon: typeof CheckCircle2; label: string; className: string }> = {
-  confirmed: { icon: CheckCircle2, label: "Da xac nhan", className: "text-emerald-600" },
-  pending: { icon: CircleDot, label: "Cho xac nhan", className: "text-amber-500" },
-  rejected: { icon: XCircle, label: "Tu choi", className: "text-red-500" },
-  replaced: { icon: RefreshCw, label: "Thay the", className: "text-blue-500" },
+const WORKER_STATUS_CONFIG: Record<WorkerAssignmentStatus, { icon: typeof CheckCircle2; label: string; className: string; bgClass: string }> = {
+  confirmed: { icon: CheckCircle2, label: "Đã xác nhận", className: "text-emerald-600", bgClass: "border-l-emerald-500" },
+  pending: { icon: CircleDot, label: "Chờ xác nhận", className: "text-amber-500", bgClass: "border-l-amber-400" },
+  rejected: { icon: XCircle, label: "Từ chối", className: "text-red-500", bgClass: "border-l-red-400" },
+  replaced: { icon: RefreshCw, label: "Thay thế", className: "text-blue-500", bgClass: "border-l-blue-400" },
 }
 
-const STATUS_CYCLE: WorkerAssignmentStatus[] = ["pending", "confirmed", "rejected"]
+/** Map UI status cycle to API assignment statuses */
+const STATUS_CYCLE_API: AssignmentStatus[] = ["created", "confirmed", "rejected"]
+
+const FILTER_TABS: { value: StatusFilter; label: string; icon?: typeof Package }[] = [
+  { value: "all", label: "Tất cả" },
+  { value: "new", label: "Mới" },
+  { value: "dispatching", label: "Đang điều phối" },
+  { value: "shortage", label: "Thiếu người" },
+  { value: "fulfilled", label: "Đã đủ" },
+]
 
 function getProgressColor(assigned: number, needed: number): string {
   const ratio = assigned / needed
@@ -223,18 +278,6 @@ function formatDate(date: Date): string {
   const days = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"]
   const day = days[date.getDay()]
   return `${day}, ${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1).toString().padStart(2, "0")}/${date.getFullYear()}`
-}
-
-function computeOrderStatus(order: DispatchOrder): OrderDispatchStatus {
-  if (order.assignedWorkers.length === 0) return "new"
-  if (order.assignedWorkers.length >= order.workersNeeded) return "fulfilled"
-  if (order.assignedWorkers.length < order.workersNeeded && order.assignedWorkers.length > 0) {
-    // If fewer than half, shortage; otherwise dispatching
-    const ratio = order.assignedWorkers.length / order.workersNeeded
-    if (ratio < 0.5) return "shortage"
-    return "dispatching"
-  }
-  return "dispatching"
 }
 
 // ---------------------------------------------------------------------------
@@ -269,33 +312,6 @@ function StatCard({
   )
 }
 
-function WorkerStatusIcon({
-  status,
-  onClick,
-}: {
-  status: WorkerAssignmentStatus
-  onClick?: () => void
-}) {
-  const config = WORKER_STATUS_CONFIG[status]
-  const Icon = config.icon
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger>
-          <button
-            type="button"
-            onClick={onClick}
-            className="rounded p-0.5 transition-colors hover:bg-muted"
-          >
-            <Icon className={`h-4 w-4 ${config.className}`} />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>{config.label} (click de doi)</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  )
-}
-
 function ProgressBar({ assigned, needed }: { assigned: number; needed: number }) {
   const percentage = needed > 0 ? Math.min((assigned / needed) * 100, 100) : 0
   return (
@@ -313,27 +329,49 @@ function ProgressBar({ assigned, needed }: { assigned: number; needed: number })
   )
 }
 
+// ---------------------------------------------------------------------------
+// OrderCard - improved with quick-assign dropdown & better worker status
+// ---------------------------------------------------------------------------
+
 function OrderCard({
   order,
-  onAddWorker,
+  isActive,
+  onSelect,
   onSendNotification,
   onViewOrder,
   onRemoveWorker,
   onToggleWorkerStatus,
+  availableWorkers,
+  onQuickAssign,
+  can,
+  isAssigning,
 }: {
   order: DispatchOrder
-  onAddWorker: (orderId: string) => void
+  isActive: boolean
+  onSelect: (orderId: string) => void
   onSendNotification: (order: DispatchOrder) => void
   onViewOrder: (orderId: string) => void
   onRemoveWorker: (orderId: string, worker: AssignedWorker) => void
-  onToggleWorkerStatus: (orderId: string, workerId: string) => void
+  onToggleWorkerStatus: (orderId: string, worker: AssignedWorker) => void
+  availableWorkers: AvailableWorker[]
+  onQuickAssign: (workerId: string, orderId: string) => void
+  can: (permission: string) => boolean
+  isAssigning: boolean
 }) {
   const statusCfg = STATUS_CONFIG[order.status]
   const isFulfilled = order.status === "fulfilled"
+  const suggestedWorkers = availableWorkers.filter((w) => workerMatchesPosition(w, order.position))
+  const canAssignMore = order.workersAssigned < order.workersNeeded
 
   return (
-    <Card className={`transition-shadow hover:shadow-md ${isFulfilled ? "opacity-75" : ""}`}>
-      {/* Order header */}
+    <Card
+      className={`cursor-pointer transition-all ${
+        isActive
+          ? "ring-2 ring-primary shadow-md"
+          : "hover:shadow-md"
+      } ${isFulfilled ? "opacity-70" : ""}`}
+      onClick={() => onSelect(order.id)}
+    >
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0 flex-1 space-y-1">
@@ -346,7 +384,6 @@ function OrderCard({
           </div>
         </div>
 
-        {/* Meta info row */}
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1">
             <Clock className="h-3.5 w-3.5" />
@@ -358,19 +395,18 @@ function OrderCard({
           </span>
         </div>
 
-        {/* Progress */}
         <div className="mt-3">
           <div className="mb-1 flex items-center justify-between text-xs">
             <span className="text-muted-foreground">
-              Can <span className="font-semibold text-foreground">{order.workersNeeded}</span> ung vien
+              Cần <span className="font-semibold text-foreground">{order.workersNeeded}</span> ứng viên
             </span>
             <span className="font-medium">
               {order.workersAssigned < order.workersNeeded ? (
                 <span className="text-amber-600">
-                  Thieu {order.workersNeeded - order.workersAssigned}
+                  Thiếu {order.workersNeeded - order.workersAssigned}
                 </span>
               ) : (
-                <span className="text-emerald-600">Du nguoi</span>
+                <span className="text-emerald-600">Đủ người</span>
               )}
             </span>
           </div>
@@ -380,66 +416,169 @@ function OrderCard({
 
       <Separator />
 
-      {/* Assigned workers list */}
       <CardContent className="pt-3">
         {order.assignedWorkers.length > 0 ? (
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground">
-              Ung vien da phan cong ({order.assignedWorkers.length})
+              Ứng viên đã phân công ({order.assignedWorkers.length})
             </p>
-            <div className="space-y-1.5">
-              {order.assignedWorkers.map((worker) => (
-                <div
-                  key={worker.id}
-                  className="group/worker flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/50"
-                >
-                  <Avatar size="sm">
-                    <AvatarFallback className="text-[10px]">{worker.avatar}</AvatarFallback>
-                  </Avatar>
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                    {worker.name}
-                  </span>
-                  <WorkerStatusIcon
-                    status={worker.status}
-                    onClick={() => onToggleWorkerStatus(order.id, worker.id)}
-                  />
-                  <span className="hidden text-xs text-muted-foreground sm:inline">
-                    {worker.phone}
-                  </span>
-                  <Phone className="h-3.5 w-3.5 shrink-0 text-muted-foreground sm:hidden" />
-                  <button
-                    type="button"
-                    onClick={() => onRemoveWorker(order.id, worker)}
-                    className="rounded p-0.5 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover/worker:opacity-100"
-                    title="Bo phan cong"
+            <div className="space-y-1">
+              {order.assignedWorkers.map((worker) => {
+                const wCfg = WORKER_STATUS_CONFIG[worker.status]
+                const WIcon = wCfg.icon
+                return (
+                  <div
+                    key={worker.id}
+                    className={`group/worker flex items-center gap-2 rounded-md border-l-[3px] px-2 py-1.5 transition-colors hover:bg-muted/50 ${wCfg.bgClass}`}
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
+                    <Avatar size="sm">
+                      <AvatarFallback className="text-[10px]">{worker.avatar}</AvatarFallback>
+                    </Avatar>
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                      {worker.name}
+                    </span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => can("assignments.update") && onToggleWorkerStatus(order.id, worker)}
+                            className={`rounded p-0.5 transition-colors ${can("assignments.update") ? "hover:bg-muted cursor-pointer" : "cursor-default opacity-60"}`}
+                            disabled={!can("assignments.update")}
+                          >
+                            <WIcon className={`h-4 w-4 ${wCfg.className}`} />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>{wCfg.label}{can("assignments.update") ? " (click để đổi)" : ""}</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <span className="hidden text-xs text-muted-foreground sm:inline">
+                      {worker.phone}
+                    </span>
+                    {can("assignments.delete") && (
+                      <button
+                        type="button"
+                        onClick={() => onRemoveWorker(order.id, worker)}
+                        className="rounded p-0.5 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover/worker:opacity-100"
+                        title="Bỏ phân công"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center py-6 text-center">
+          <div className="flex flex-col items-center py-4 text-center">
             <Users className="mb-2 h-8 w-8 text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground">Chua co worker nao duoc phan cong</p>
-            <p className="text-xs text-muted-foreground/70">Nhan &quot;Them ung vien&quot; de bat dau dieu phoi</p>
+            <p className="text-sm text-muted-foreground">Chưa có ứng viên nào</p>
           </div>
         )}
 
         {/* Actions */}
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button size="sm" variant="default" className="gap-1.5" onClick={() => onAddWorker(order.id)}>
-            <Plus className="h-3.5 w-3.5" />
-            Them ung vien
-          </Button>
-          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => onSendNotification(order)}>
-            <Bell className="h-3.5 w-3.5" />
-            Gui thong bao
-          </Button>
+        <div className="mt-3 flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
+          {/* Quick-assign dropdown: shows top 5 matching workers */}
+          {canAssignMore && can("assignments.create") && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" className="gap-1.5" disabled={isAssigning}>
+                  {isAssigning ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Plus className="h-3.5 w-3.5" />
+                  )}
+                  Thêm nhanh
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-64">
+                {suggestedWorkers.length > 0 ? (
+                  <>
+                    <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                      Gợi ý phù hợp ({suggestedWorkers.length})
+                    </div>
+                    {suggestedWorkers.slice(0, 5).map((w) => (
+                      <DropdownMenuItem
+                        key={w.id}
+                        onClick={() => onQuickAssign(w.id, order.id)}
+                        className="flex items-center gap-2"
+                      >
+                        <Avatar size="sm">
+                          <AvatarFallback className="text-[10px]">{w.avatar}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm">{w.name}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {w.skills.join(", ")} · {w.area}
+                          </p>
+                        </div>
+                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                        <span className="text-xs">{w.rating}</span>
+                      </DropdownMenuItem>
+                    ))}
+                    {availableWorkers.filter((w) => !suggestedWorkers.includes(w)).length > 0 && (
+                      <>
+                        <Separator className="my-1" />
+                        <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                          Khác
+                        </div>
+                        {availableWorkers
+                          .filter((w) => !suggestedWorkers.includes(w))
+                          .slice(0, 3)
+                          .map((w) => (
+                            <DropdownMenuItem
+                              key={w.id}
+                              onClick={() => onQuickAssign(w.id, order.id)}
+                              className="flex items-center gap-2"
+                            >
+                              <Avatar size="sm">
+                                <AvatarFallback className="text-[10px]">{w.avatar}</AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm">{w.name}</p>
+                                <p className="text-[10px] text-muted-foreground">
+                                  {w.skills.join(", ")} · {w.area}
+                                </p>
+                              </div>
+                            </DropdownMenuItem>
+                          ))}
+                      </>
+                    )}
+                  </>
+                ) : (
+                  availableWorkers.slice(0, 5).map((w) => (
+                    <DropdownMenuItem
+                      key={w.id}
+                      onClick={() => onQuickAssign(w.id, order.id)}
+                      className="flex items-center gap-2"
+                    >
+                      <Avatar size="sm">
+                        <AvatarFallback className="text-[10px]">{w.avatar}</AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm">{w.name}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {w.skills.join(", ")} · {w.area}
+                        </p>
+                      </div>
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {can("assignments.update") && (
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => onSendNotification(order)}>
+              <Bell className="h-3.5 w-3.5" />
+              Gửi thông báo
+            </Button>
+          )}
           <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => onViewOrder(order.id)}>
             <ExternalLink className="h-3.5 w-3.5" />
-            Xem yeu cau
+            Chi tiết
           </Button>
         </div>
       </CardContent>
@@ -447,264 +586,116 @@ function OrderCard({
   )
 }
 
+// ---------------------------------------------------------------------------
+// AvailableWorkerRow - improved with skill match badge, checkbox for multi-select
+// ---------------------------------------------------------------------------
+
 function AvailableWorkerRow({
   worker,
+  isSelected,
+  isMatch,
+  onToggleSelect,
   onAssign,
+  activeOrderId,
+  can,
 }: {
   worker: AvailableWorker
-  onAssign: (worker: AvailableWorker) => void
+  isSelected: boolean
+  isMatch: boolean
+  onToggleSelect: (id: string) => void
+  onAssign: (workerId: string) => void
+  activeOrderId: string | null
+  can: (permission: string) => boolean
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors hover:bg-muted/50">
+    <div
+      className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 transition-colors ${
+        isMatch
+          ? "border-primary/40 bg-primary/5"
+          : "hover:bg-muted/50"
+      } ${isSelected ? "ring-1 ring-primary bg-primary/5" : ""}`}
+    >
+      <Checkbox
+        checked={isSelected}
+        onCheckedChange={() => onToggleSelect(worker.id)}
+        className="shrink-0"
+      />
+
       <Avatar size="sm">
         <AvatarFallback className="text-[10px]">{worker.avatar}</AvatarFallback>
       </Avatar>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{worker.name}</p>
-        <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <p className="truncate text-sm font-medium">{worker.name}</p>
+          {isMatch && (
+            <Badge variant="default" className="h-4 gap-0.5 px-1 text-[9px]">
+              <Zap className="h-2.5 w-2.5" />
+              Phù hợp
+            </Badge>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-0.5">
             <MapPin className="h-3 w-3" />
             {worker.area}
           </span>
           <span className="inline-flex items-center gap-0.5">
             <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-            {worker.rating}
+            {Number(worker.rating).toFixed(1)}
           </span>
+        </div>
+        <div className="mt-0.5 flex flex-wrap gap-1">
+          {worker.skills.map((skill, idx) => (
+            <Badge key={`${skill}-${idx}`} variant="secondary" className="text-[10px]">
+              {skill}
+            </Badge>
+          ))}
         </div>
       </div>
 
-      <div className="hidden flex-wrap gap-1 lg:flex">
-        {worker.skills.map((skill) => (
-          <Badge key={skill} variant="secondary" className="text-[10px]">
-            {skill}
-          </Badge>
-        ))}
-      </div>
-
-      <Button size="sm" variant="outline" className="shrink-0 gap-1" onClick={() => onAssign(worker)}>
-        <Plus className="h-3 w-3" />
-        <span className="hidden sm:inline">Phan cong</span>
-      </Button>
+      {activeOrderId && can("assignments.create") && (
+        <Button
+          size="sm"
+          variant={isMatch ? "default" : "outline"}
+          className="shrink-0 gap-1 px-2"
+          onClick={(e) => {
+            e.stopPropagation()
+            onAssign(worker.id)
+          }}
+        >
+          <Plus className="h-3 w-3" />
+        </Button>
+      )}
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Dialog: Assign worker to an order (from sidebar "Phan cong" button)
+// Loading skeleton
 // ---------------------------------------------------------------------------
 
-function AssignWorkerToOrderDialog({
-  open,
-  onOpenChange,
-  worker,
-  orders,
-  onConfirm,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  worker: AvailableWorker | null
-  orders: DispatchOrder[]
-  onConfirm: (workerId: string, orderId: string) => void
-}) {
-  const [selectedOrderId, setSelectedOrderId] = useState<string>("")
-
-  // Only show orders that still need workers
-  const availableOrders = orders.filter((o) => o.workersAssigned < o.workersNeeded)
-
-  function handleConfirm() {
-    if (!worker || !selectedOrderId) return
-    onConfirm(worker.id, selectedOrderId)
-    setSelectedOrderId("")
-    onOpenChange(false)
-  }
-
+function DispatchBoardSkeleton() {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Phan cong ung vien</DialogTitle>
-          <DialogDescription>
-            {worker ? (
-              <>Phan cong <strong>{worker.name}</strong> vao yeu cau tuyen dung</>
-            ) : (
-              "Chon yeu cau tuyen dung"
-            )}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-2 py-2">
-          {availableOrders.length > 0 ? (
-            availableOrders.map((order) => (
-              <label
-                key={order.id}
-                className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50 ${
-                  selectedOrderId === order.id ? "border-primary bg-primary/5 ring-1 ring-primary" : ""
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="order-select"
-                  value={order.id}
-                  checked={selectedOrderId === order.id}
-                  onChange={() => setSelectedOrderId(order.id)}
-                  className="sr-only"
-                />
-                <div
-                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${
-                    selectedOrderId === order.id ? "border-primary" : "border-muted-foreground/30"
-                  }`}
-                >
-                  {selectedOrderId === order.id && (
-                    <div className="h-2 w-2 rounded-full bg-primary" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-semibold text-primary">{order.code}</span>
-                    <Badge className={STATUS_CONFIG[order.status].className + " text-[10px]"}>
-                      {STATUS_CONFIG[order.status].label}
-                    </Badge>
-                  </div>
-                  <p className="truncate text-sm">{order.customer} - {order.position}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Can {order.workersNeeded} | Da co {order.workersAssigned} | Thieu {order.workersNeeded - order.workersAssigned}
-                  </p>
-                </div>
-              </label>
-            ))
-          ) : (
-            <p className="py-4 text-center text-sm text-muted-foreground">
-              Tat ca yeu cau da du nguoi
-            </p>
-          )}
+    <div className="space-y-6">
+      <div>
+        <Skeleton className="h-8 w-64 mb-2" />
+        <Skeleton className="h-5 w-96" />
+      </div>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-24 rounded-lg" />
+        ))}
+      </div>
+      <div className="grid gap-6 xl:grid-cols-[1fr_400px]">
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-48 rounded-lg" />
+          ))}
         </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Huy
-          </Button>
-          <Button
-            onClick={handleConfirm}
-            disabled={!selectedOrderId || !worker}
-          >
-            Phan cong
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Dialog: Add worker to order (from order card "Them ung vien" button)
-// ---------------------------------------------------------------------------
-
-function AddWorkerToOrderDialog({
-  open,
-  onOpenChange,
-  orderId,
-  orders,
-  availableWorkers,
-  onSelect,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  orderId: string | null
-  orders: DispatchOrder[]
-  availableWorkers: AvailableWorker[]
-  onSelect: (workerId: string, orderId: string) => void
-}) {
-  const [search, setSearch] = useState("")
-
-  const order = orders.find((o) => o.id === orderId)
-
-  const filtered = availableWorkers.filter((w) =>
-    w.name.toLowerCase().includes(search.toLowerCase()) ||
-    w.skills.some((s) => s.toLowerCase().includes(search.toLowerCase())) ||
-    w.area.toLowerCase().includes(search.toLowerCase())
-  )
-
-  function handleSelect(workerId: string) {
-    if (!orderId) return
-    onSelect(workerId, orderId)
-    setSearch("")
-    onOpenChange(false)
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setSearch("") }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Them ung vien</DialogTitle>
-          <DialogDescription>
-            {order ? (
-              <>Chon ung vien cho <strong>{order.code}</strong> - {order.customer}</>
-            ) : (
-              "Chon ung vien"
-            )}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Tim theo ten, ky nang, khu vuc..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-
-        <ScrollArea className="max-h-[300px]">
-          <div className="space-y-2">
-            {filtered.length > 0 ? (
-              filtered.map((worker) => (
-                <div
-                  key={worker.id}
-                  className="flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors hover:bg-muted/50"
-                >
-                  <Avatar size="sm">
-                    <AvatarFallback className="text-[10px]">{worker.avatar}</AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{worker.name}</p>
-                    <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                      <span className="inline-flex items-center gap-0.5">
-                        <MapPin className="h-3 w-3" />
-                        {worker.area}
-                      </span>
-                      <span className="inline-flex items-center gap-0.5">
-                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                        {worker.rating}
-                      </span>
-                      {worker.skills.map((skill) => (
-                        <Badge key={skill} variant="secondary" className="text-[10px]">
-                          {skill}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                  <Button size="sm" onClick={() => handleSelect(worker.id)}>
-                    Chon
-                  </Button>
-                </div>
-              ))
-            ) : (
-              <p className="py-4 text-center text-sm text-muted-foreground">
-                Khong tim thay ung vien phu hop
-              </p>
-            )}
-          </div>
-        </ScrollArea>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Dong
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        <Skeleton className="h-96 rounded-lg" />
+      </div>
+    </div>
   )
 }
 
@@ -714,32 +705,97 @@ function AddWorkerToOrderDialog({
 
 export function DispatchBoard() {
   const navigate = useNavigate()
+  const can = usePermissions()
 
-  // Mutable state for orders and available workers
-  const [orders, setOrders] = useState<DispatchOrder[]>(INITIAL_ORDERS)
-  const [availableWorkers, setAvailableWorkers] = useState<AvailableWorker[]>(INITIAL_AVAILABLE_WORKERS)
+  // -----------------------------------------------------------------------
+  // API hooks - fetch orders (recruiting / in_progress) and available workers
+  // -----------------------------------------------------------------------
+  const {
+    data: ordersData,
+    isLoading: ordersLoading,
+  } = useStaffingOrders(
+    {
+      status: "recruiting,in_progress,approved,filled",
+      per_page: 50,
+      include: "assignments.worker",
+    },
+    { refetchInterval: 30_000 }, // Auto-refresh every 30s
+  )
 
+  const {
+    data: workersData,
+    isLoading: workersLoading,
+  } = useWorkersNew(
+    { status: "available", per_page: 100 },
+    { refetchInterval: 30_000 },
+  )
+
+  // Mutations
+  const createAssignment = useCreateAssignment()
+  const bulkAssign = useBulkAssign()
+  const removeAssignment = useRemoveAssignment()
+  const updateAssignmentStatus = useUpdateAssignmentStatus()
+
+  const isAssigning = createAssignment.isPending || bulkAssign.isPending
+
+  // -----------------------------------------------------------------------
+  // Map API data to UI shapes
+  // -----------------------------------------------------------------------
+  const orders: DispatchOrder[] = useMemo(() => {
+    if (!ordersData?.data) return []
+    return ordersData.data.map(mapOrderToDispatch)
+  }, [ordersData])
+
+  const availableWorkers: AvailableWorker[] = useMemo(() => {
+    if (!workersData?.data) return []
+    return workersData.data.map(mapWorkerToAvailable)
+  }, [workersData])
+
+  // -----------------------------------------------------------------------
+  // Local UI state
+  // -----------------------------------------------------------------------
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [searchWorker, setSearchWorker] = useState("")
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null)
+  const [selectedWorkerIds, setSelectedWorkerIds] = useState<string[]>([])
 
-  // Dialog states
-  const [assignDialogOpen, setAssignDialogOpen] = useState(false)
-  const [assignDialogWorker, setAssignDialogWorker] = useState<AvailableWorker | null>(null)
-
-  const [addWorkerDialogOpen, setAddWorkerDialogOpen] = useState(false)
-  const [addWorkerOrderId, setAddWorkerOrderId] = useState<string | null>(null)
-
+  // Confirm dialog
   const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<{ orderId: string; worker: AssignedWorker } | null>(null)
 
-  // Filter workers in sidebar
-  const filteredWorkers = availableWorkers.filter((w) =>
-    w.name.toLowerCase().includes(searchWorker.toLowerCase()) ||
-    w.skills.some((s) => s.toLowerCase().includes(searchWorker.toLowerCase())) ||
-    w.area.toLowerCase().includes(searchWorker.toLowerCase())
-  )
+  // Active order
+  const activeOrder = activeOrderId ? orders.find((o) => o.id === activeOrderId) ?? null : null
 
-  // Reactive stats computed from current state
+  // Filtered orders by status
+  const filteredOrders = useMemo(() => {
+    if (statusFilter === "all") return orders
+    return orders.filter((o) => o.status === statusFilter)
+  }, [orders, statusFilter])
+
+  // Filter + sort workers: matches first, then by search
+  const processedWorkers = useMemo(() => {
+    let filtered = availableWorkers.filter((w) =>
+      w.name.toLowerCase().includes(searchWorker.toLowerCase()) ||
+      w.skills.some((s) => s.toLowerCase().includes(searchWorker.toLowerCase())) ||
+      w.area.toLowerCase().includes(searchWorker.toLowerCase())
+    )
+
+    if (activeOrder) {
+      // Sort: matching workers first, then by rating
+      const matches = filtered.filter((w) => workerMatchesPosition(w, activeOrder.position))
+      const nonMatches = filtered.filter((w) => !workerMatchesPosition(w, activeOrder.position))
+      filtered = [...matches, ...nonMatches]
+    }
+
+    return filtered
+  }, [availableWorkers, searchWorker, activeOrder])
+
+  const matchCount = activeOrder
+    ? processedWorkers.filter((w) => workerMatchesPosition(w, activeOrder.position)).length
+    : 0
+
+  // Stats
   const stats = useMemo(() => {
     const ordersNeedDispatch = orders.filter((o) => o.status !== "fulfilled").length
     const totalAssigned = orders.reduce((sum, o) => sum + o.workersAssigned, 0)
@@ -749,137 +805,101 @@ export function DispatchBoard() {
     return { ordersNeedDispatch, totalAssigned, totalNeeded, unassignedWorkers, completionRate }
   }, [orders, availableWorkers])
 
-  // -----------------------------------------------------------------------
-  // Core action: assign a worker (from available) to an order
-  // -----------------------------------------------------------------------
-  function assignWorkerToOrder(workerId: string, orderId: string) {
-    const worker = availableWorkers.find((w) => w.id === workerId)
-    if (!worker) return
+  // Filter tab counts
+  const statusCounts = useMemo(() => {
+    const counts: Record<StatusFilter, number> = { all: orders.length, new: 0, dispatching: 0, shortage: 0, fulfilled: 0 }
+    orders.forEach((o) => { counts[o.status]++ })
+    return counts
+  }, [orders])
 
-    const order = orders.find((o) => o.id === orderId)
+  // -----------------------------------------------------------------------
+  // Core action: assign worker(s) to order via API
+  // -----------------------------------------------------------------------
+  const assignWorkerToOrder = useCallback((workerId: string, orderId: string) => {
+    createAssignment.mutate(
+      { order_id: orderId, worker_id: workerId },
+    )
+  }, [createAssignment])
+
+  // Bulk assign selected workers to active order
+  const bulkAssignToActiveOrder = useCallback(() => {
+    if (!activeOrderId || selectedWorkerIds.length === 0) return
+    const order = orders.find((o) => o.id === activeOrderId)
     if (!order) return
 
-    const assignedWorker: AssignedWorker = {
-      id: worker.id,
-      name: worker.name,
-      phone: worker.phone,
-      status: "pending",
-      avatar: worker.avatar,
+    const remaining = order.workersNeeded - order.workersAssigned
+    const toAssign = selectedWorkerIds.slice(0, remaining)
+
+    bulkAssign.mutate(
+      { staffing_order_id: activeOrderId, worker_ids: toAssign },
+      {
+        onSuccess: () => {
+          setSelectedWorkerIds([])
+        },
+      },
+    )
+  }, [activeOrderId, selectedWorkerIds, orders, bulkAssign])
+
+  // -----------------------------------------------------------------------
+  // Remove worker via API
+  // -----------------------------------------------------------------------
+  function removeWorkerFromOrder(_orderId: string, worker: AssignedWorker) {
+    removeAssignment.mutate(worker.id) // worker.id is assignment id
+  }
+
+  // -----------------------------------------------------------------------
+  // Toggle worker assignment status via API
+  // -----------------------------------------------------------------------
+  function toggleWorkerStatus(_orderId: string, worker: AssignedWorker) {
+    const currentIdx = STATUS_CYCLE_API.indexOf(worker.assignmentStatus)
+    const nextIdx = currentIdx === -1 ? 0 : (currentIdx + 1) % STATUS_CYCLE_API.length
+    const newStatus = STATUS_CYCLE_API[nextIdx]
+
+    updateAssignmentStatus.mutate({ id: worker.id, status: newStatus })
+  }
+
+  // -----------------------------------------------------------------------
+  // Sidebar: toggle worker selection
+  // -----------------------------------------------------------------------
+  function toggleWorkerSelect(workerId: string) {
+    setSelectedWorkerIds((prev) =>
+      prev.includes(workerId) ? prev.filter((id) => id !== workerId) : [...prev, workerId]
+    )
+  }
+
+  // -----------------------------------------------------------------------
+  // Direct assign from sidebar (single worker to active order)
+  // -----------------------------------------------------------------------
+  function handleDirectAssign(workerId: string) {
+    if (!activeOrderId) {
+      toast.error("Vui lòng chọn một yêu cầu trước")
+      return
     }
-
-    setOrders((prev) =>
-      prev.map((o) => {
-        if (o.id !== orderId) return o
-        const updated = {
-          ...o,
-          assignedWorkers: [...o.assignedWorkers, assignedWorker],
-          workersAssigned: o.workersAssigned + 1,
-        }
-        updated.status = computeOrderStatus(updated)
-        return updated
-      })
-    )
-
-    setAvailableWorkers((prev) => prev.filter((w) => w.id !== workerId))
-
-    toast.success(`Da phan cong ${worker.name} vao ${order.code}`)
+    assignWorkerToOrder(workerId, activeOrderId)
   }
 
   // -----------------------------------------------------------------------
-  // Remove worker from assignment
+  // Select/deselect an order
   // -----------------------------------------------------------------------
-  function removeWorkerFromOrder(orderId: string, worker: AssignedWorker) {
-    const order = orders.find((o) => o.id === orderId)
-    if (!order) return
-
-    // Move worker back to available list
-    const returnedWorker: AvailableWorker = {
-      id: worker.id,
-      name: worker.name,
-      avatar: worker.avatar,
-      skills: [],
-      area: "",
-      rating: 0,
-      phone: worker.phone,
-    }
-
-    setOrders((prev) =>
-      prev.map((o) => {
-        if (o.id !== orderId) return o
-        const updated = {
-          ...o,
-          assignedWorkers: o.assignedWorkers.filter((w) => w.id !== worker.id),
-          workersAssigned: Math.max(0, o.workersAssigned - 1),
-        }
-        updated.status = computeOrderStatus(updated)
-        return updated
-      })
-    )
-
-    setAvailableWorkers((prev) => [...prev, returnedWorker])
-
-    toast.success(`Da bo phan cong ${worker.name} khoi ${order.code}`)
+  function handleSelectOrder(orderId: string) {
+    setActiveOrderId((prev) => (prev === orderId ? null : orderId))
+    setSelectedWorkerIds([])
   }
 
   // -----------------------------------------------------------------------
-  // Toggle worker assignment status
-  // -----------------------------------------------------------------------
-  function toggleWorkerStatus(orderId: string, workerId: string) {
-    setOrders((prev) =>
-      prev.map((o) => {
-        if (o.id !== orderId) return o
-        return {
-          ...o,
-          assignedWorkers: o.assignedWorkers.map((w) => {
-            if (w.id !== workerId) return w
-            const currentIdx = STATUS_CYCLE.indexOf(w.status)
-            const nextIdx = currentIdx === -1 ? 0 : (currentIdx + 1) % STATUS_CYCLE.length
-            const newStatus = STATUS_CYCLE[nextIdx]
-            toast.success(`Da doi trang thai ${w.name} sang ${WORKER_STATUS_CONFIG[newStatus].label}`)
-            return { ...w, status: newStatus }
-          }),
-        }
-      })
-    )
-  }
-
-  // -----------------------------------------------------------------------
-  // Sidebar: open assign dialog for a worker
-  // -----------------------------------------------------------------------
-  function handleSidebarAssign(worker: AvailableWorker) {
-    setAssignDialogWorker(worker)
-    setAssignDialogOpen(true)
-  }
-
-  // -----------------------------------------------------------------------
-  // Order card: open add worker dialog
-  // -----------------------------------------------------------------------
-  function handleAddWorkerToOrder(orderId: string) {
-    setAddWorkerOrderId(orderId)
-    setAddWorkerDialogOpen(true)
-  }
-
-  // -----------------------------------------------------------------------
-  // Order card: send notification
+  // Notification
   // -----------------------------------------------------------------------
   function handleSendNotification(order: DispatchOrder) {
     const count = order.assignedWorkers.length
     if (count === 0) {
-      toast.error(`${order.code} chua co ung vien nao de gui thong bao`)
+      toast.error(`${order.code} chưa có ứng viên nào để gửi thông báo`)
       return
     }
-    toast.success(`Da gui thong bao den ${count} ung vien cua ${order.code}`)
+    toast.success(`Đã gửi thông báo đến ${count} ứng viên của ${order.code}`)
   }
 
   // -----------------------------------------------------------------------
-  // Order card: view order detail
-  // -----------------------------------------------------------------------
-  function handleViewOrder(orderId: string) {
-    navigate(`/orders/${orderId}`)
-  }
-
-  // -----------------------------------------------------------------------
-  // Order card: remove worker (with confirm)
+  // Remove worker confirm
   // -----------------------------------------------------------------------
   function handleRemoveWorker(orderId: string, worker: AssignedWorker) {
     setRemoveTarget({ orderId, worker })
@@ -894,13 +914,6 @@ export function DispatchBoard() {
   }
 
   // -----------------------------------------------------------------------
-  // Header: create dispatch button
-  // -----------------------------------------------------------------------
-  function handleCreateDispatch() {
-    toast.info("Vui long chon ung vien tu danh sach ben phai va phan cong vao yeu cau")
-  }
-
-  // -----------------------------------------------------------------------
   // Date navigation
   // -----------------------------------------------------------------------
   function navigateDate(direction: -1 | 1) {
@@ -911,6 +924,13 @@ export function DispatchBoard() {
     })
   }
 
+  // -----------------------------------------------------------------------
+  // Loading state
+  // -----------------------------------------------------------------------
+  if (ordersLoading && workersLoading) {
+    return <DispatchBoardSkeleton />
+  }
+
   return (
     <div className="space-y-6">
       {/* ----------------------------------------------------------------- */}
@@ -918,14 +938,13 @@ export function DispatchBoard() {
       {/* ----------------------------------------------------------------- */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dieu phoi nhan su</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Điều phối nhân sự</h1>
           <p className="text-muted-foreground">
-            Quan ly phan cong va dieu phoi ung vien cho cac yeu cau tuyen dung
+            Chọn yêu cầu &rarr; chọn ứng viên phù hợp &rarr; phân công
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Date navigator */}
           <div className="inline-flex items-center rounded-lg border bg-background">
             <Button
               variant="ghost"
@@ -948,11 +967,6 @@ export function DispatchBoard() {
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-
-          <Button className="gap-1.5" onClick={handleCreateDispatch}>
-            <Plus className="h-4 w-4" />
-            Tao phan cong
-          </Button>
         </div>
       </div>
 
@@ -961,28 +975,28 @@ export function DispatchBoard() {
       {/* ----------------------------------------------------------------- */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
-          title="YCTD can dieu phoi"
+          title="YCTD cần điều phối"
           value={stats.ordersNeedDispatch}
           icon={Package}
           color="text-amber-600"
           bgColor="bg-amber-50"
         />
         <StatCard
-          title="Ung vien da phan cong"
+          title="Ứng viên đã phân công"
           value={stats.totalAssigned}
           icon={UserCheck}
           color="text-emerald-600"
           bgColor="bg-emerald-50"
         />
         <StatCard
-          title="Ung vien chua phan cong"
+          title="Ứng viên chưa phân công"
           value={stats.unassignedWorkers}
           icon={UserX}
           color="text-red-600"
           bgColor="bg-red-50"
         />
         <StatCard
-          title="Ty le hoan thanh"
+          title="Tỷ lệ hoàn thành"
           value={`${stats.completionRate}%`}
           icon={TrendingUp}
           color="text-blue-600"
@@ -991,36 +1005,83 @@ export function DispatchBoard() {
       </div>
 
       {/* ----------------------------------------------------------------- */}
+      {/* Filter tabs                                                       */}
+      {/* ----------------------------------------------------------------- */}
+      <div className="flex flex-wrap items-center gap-2">
+        {FILTER_TABS.map((tab) => {
+          const isActive = statusFilter === tab.value
+          const count = statusCounts[tab.value]
+          return (
+            <Button
+              key={tab.value}
+              variant={isActive ? "default" : "outline"}
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setStatusFilter(tab.value)}
+            >
+              {tab.value !== "all" && (
+                <span className={`h-2 w-2 rounded-full ${STATUS_CONFIG[tab.value as OrderDispatchStatus]?.dotColor ?? ""}`} />
+              )}
+              {tab.label}
+              <Badge variant={isActive ? "secondary" : "outline"} className="ml-0.5 h-5 px-1.5 text-[10px]">
+                {count}
+              </Badge>
+            </Button>
+          )
+        })}
+      </div>
+
+      {/* ----------------------------------------------------------------- */}
+      {/* Instruction hint when no order selected                           */}
+      {/* ----------------------------------------------------------------- */}
+      {!activeOrderId && (
+        <div className="flex items-center gap-2 rounded-lg border border-dashed border-primary/30 bg-primary/5 px-4 py-3 text-sm text-primary">
+          <Sparkles className="h-4 w-4 shrink-0" />
+          <span>Chọn một yêu cầu bên trái để xem gợi ý ứng viên phù hợp bên phải</span>
+        </div>
+      )}
+
+      {/* ----------------------------------------------------------------- */}
       {/* Main content: Orders + Available workers                           */}
       {/* ----------------------------------------------------------------- */}
-      <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
+      <div className="grid gap-6 xl:grid-cols-[1fr_400px]">
         {/* Orders column */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">
-              Yeu cau hom nay
+              Yêu cầu hôm nay
               <span className="ml-2 text-sm font-normal text-muted-foreground">
-                ({orders.length} don)
+                ({filteredOrders.length} đơn)
               </span>
             </h2>
-            <Button variant="outline" size="sm" className="gap-1.5">
-              <Filter className="h-3.5 w-3.5" />
-              Loc
-            </Button>
+            {ordersLoading && (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            )}
           </div>
 
           <div className="space-y-4">
-            {orders.map((order) => (
+            {filteredOrders.map((order) => (
               <OrderCard
                 key={order.id}
                 order={order}
-                onAddWorker={handleAddWorkerToOrder}
+                isActive={activeOrderId === order.id}
+                onSelect={handleSelectOrder}
                 onSendNotification={handleSendNotification}
-                onViewOrder={handleViewOrder}
+                onViewOrder={(id) => navigate(`/orders/${id}`)}
                 onRemoveWorker={handleRemoveWorker}
                 onToggleWorkerStatus={toggleWorkerStatus}
+                availableWorkers={availableWorkers}
+                onQuickAssign={assignWorkerToOrder}
+                can={can}
+                isAssigning={isAssigning}
               />
             ))}
+            {filteredOrders.length === 0 && !ordersLoading && (
+              <div className="flex flex-col items-center py-12 text-center">
+                <Package className="mb-2 h-10 w-10 text-muted-foreground/30" />
+                <p className="text-sm text-muted-foreground">Không có yêu cầu nào ở trạng thái này</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1031,14 +1092,23 @@ export function DispatchBoard() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Sparkles className="h-4 w-4 text-primary" />
-                  Ung vien san sang
-                  <Badge variant="secondary">{filteredWorkers.length}</Badge>
+                  Ứng viên sẵn sàng
+                  <Badge variant="secondary">{processedWorkers.length}</Badge>
                 </CardTitle>
+                {workersLoading && (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                )}
               </div>
+              {activeOrder && matchCount > 0 && (
+                <p className="mt-1 flex items-center gap-1 text-xs text-primary">
+                  <Zap className="h-3 w-3" />
+                  {matchCount} ứng viên phù hợp với "{activeOrder.position}"
+                </p>
+              )}
               <div className="relative mt-2">
                 <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Tim theo ten, ky nang, khu vuc..."
+                  placeholder="Tìm theo tên, kỹ năng, khu vực..."
                   value={searchWorker}
                   onChange={(e) => setSearchWorker(e.target.value)}
                   className="pl-9"
@@ -1048,22 +1118,57 @@ export function DispatchBoard() {
 
             <Separator />
 
+            {/* Bulk assign bar */}
+            {selectedWorkerIds.length > 0 && activeOrderId && can("assignments.create") && (
+              <div className="flex items-center gap-2 border-b bg-primary/5 px-4 py-2">
+                <span className="text-xs font-medium text-primary">
+                  Đã chọn {selectedWorkerIds.length} ứng viên
+                </span>
+                <Button
+                  size="sm"
+                  className="ml-auto h-7 gap-1 px-2 text-xs"
+                  onClick={bulkAssignToActiveOrder}
+                  disabled={isAssigning}
+                >
+                  {isAssigning ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Plus className="h-3 w-3" />
+                  )}
+                  Phân công tất cả vào {activeOrder?.code}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-1.5"
+                  onClick={() => setSelectedWorkerIds([])}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            )}
+
             <CardContent className="p-0">
               <ScrollArea className="h-[calc(100vh-380px)] min-h-[400px]">
                 <div className="space-y-2 p-4">
-                  {filteredWorkers.length > 0 ? (
-                    filteredWorkers.map((worker) => (
+                  {processedWorkers.length > 0 ? (
+                    processedWorkers.map((worker) => (
                       <AvailableWorkerRow
                         key={worker.id}
                         worker={worker}
-                        onAssign={handleSidebarAssign}
+                        isSelected={selectedWorkerIds.includes(worker.id)}
+                        isMatch={activeOrder ? workerMatchesPosition(worker, activeOrder.position) : false}
+                        onToggleSelect={toggleWorkerSelect}
+                        onAssign={handleDirectAssign}
+                        activeOrderId={activeOrderId}
+                        can={can}
                       />
                     ))
                   ) : (
                     <div className="flex flex-col items-center py-8 text-center">
                       <Search className="mb-2 h-8 w-8 text-muted-foreground/40" />
                       <p className="text-sm text-muted-foreground">
-                        Khong tim thay worker phu hop
+                        {workersLoading ? "Đang tải danh sách..." : "Không tìm thấy ứng viên phù hợp"}
                       </p>
                     </div>
                   )}
@@ -1075,48 +1180,34 @@ export function DispatchBoard() {
       </div>
 
       {/* ----------------------------------------------------------------- */}
-      {/* Dialogs                                                           */}
+      {/* AlertDialog: Confirm remove worker                                */}
       {/* ----------------------------------------------------------------- */}
-
-      {/* Dialog: Assign worker from sidebar to an order */}
-      <AssignWorkerToOrderDialog
-        open={assignDialogOpen}
-        onOpenChange={setAssignDialogOpen}
-        worker={assignDialogWorker}
-        orders={orders}
-        onConfirm={assignWorkerToOrder}
-      />
-
-      {/* Dialog: Add worker to a specific order */}
-      <AddWorkerToOrderDialog
-        open={addWorkerDialogOpen}
-        onOpenChange={setAddWorkerDialogOpen}
-        orderId={addWorkerOrderId}
-        orders={orders}
-        availableWorkers={availableWorkers}
-        onSelect={assignWorkerToOrder}
-      />
-
-      {/* AlertDialog: Confirm remove worker */}
       <AlertDialog open={removeConfirmOpen} onOpenChange={setRemoveConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Bo phan cong</AlertDialogTitle>
+            <AlertDialogTitle>Bỏ phân công</AlertDialogTitle>
             <AlertDialogDescription>
               {removeTarget ? (
                 <>
-                  Ban co chac muon bo phan cong <strong>{removeTarget.worker.name}</strong> khoi{" "}
+                  Bạn có chắc muốn bỏ phân công <strong>{removeTarget.worker.name}</strong> khỏi{" "}
                   <strong>{orders.find((o) => o.id === removeTarget.orderId)?.code}</strong>?
                 </>
               ) : (
-                "Xac nhan bo phan cong?"
+                "Xác nhận bỏ phân công?"
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Huy</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={confirmRemoveWorker}>
-              Bo phan cong
+            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={confirmRemoveWorker}
+              disabled={removeAssignment.isPending}
+            >
+              {removeAssignment.isPending ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              ) : null}
+              Bỏ phân công
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
